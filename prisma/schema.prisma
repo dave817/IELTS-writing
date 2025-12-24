@@ -1,0 +1,48 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Question {
+  id             String        @id @default(cuid())
+  taskType       String        // "Task 1" | "Task 2"
+  questionType   String        // "Type A" | "Type B" | ... | "Map" | "Chart"
+  questionText   String
+  band9Model     String?       // The Band 9 model answer text
+  keyVocabulary  String?       // JSON string of vocab
+  source         String?
+  practiceLogs   PracticeLog[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model UserTemplate {
+  id           String   @id @default(cuid())
+  userId       String   @default("default")
+  templateText String
+  name         String?
+  version      Int      @default(1)
+  isLocked     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model PracticeLog {
+  id           String   @id @default(cuid())
+  userId       String   @default("default")
+  questionId   String?
+  question     Question? @relation(fields: [questionId], references: [id])
+  drillType    String   // "Full" | "Opening" | "Body" | "Counter" | "TemplateFill" | "PointGeneration"
+  userResponse String
+  feedback     String?  // JSON string of AI feedback
+  wordCount    Int?
+  timeTaken    Int?     // in seconds
+  createdAt    DateTime @default(now())
+}
