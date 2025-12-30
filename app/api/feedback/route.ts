@@ -224,15 +224,13 @@ export async function POST(request: Request) {
     const response = await openai.chat.completions.create({
       model: deployment,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: systemPrompt + "\n\nIMPORTANT: You must respond with valid JSON only, no markdown formatting, no code blocks, just pure JSON." },
         { role: "user", content: userMessage },
       ],
       max_completion_tokens: 2000,
-      temperature: 0.7,
-      response_format: { type: "json_object" },
     });
 
-    const feedbackText = response.choices[0]?.message?.content;
+    let feedbackText = response.choices[0]?.message?.content;
     if (!feedbackText) {
       return NextResponse.json(
         { error: "No response from AI" },
@@ -240,12 +238,33 @@ export async function POST(request: Request) {
       );
     }
 
+    // Clean up potential markdown code blocks
+    feedbackText = feedbackText.trim();
+    if (feedbackText.startsWith("```json")) {
+      feedbackText = feedbackText.slice(7);
+    } else if (feedbackText.startsWith("```")) {
+      feedbackText = feedbackText.slice(3);
+    }
+    if (feedbackText.endsWith("```")) {
+      feedbackText = feedbackText.slice(0, -3);
+    }
+    feedbackText = feedbackText.trim();
+
     const feedback = JSON.parse(feedbackText);
     return NextResponse.json({ feedback });
   } catch (err) {
     console.error("AI Feedback Error:", err);
+    // Log more details for debugging
+    if (err instanceof Error) {
+      console.error("Error name:", err.name);
+      console.error("Error message:", err.message);
+      console.error("Error stack:", err.stack);
+    }
     return NextResponse.json(
-      { error: "Failed to get AI feedback" },
+      { 
+        error: "Failed to get AI feedback",
+        details: err instanceof Error ? err.message : "Unknown error"
+      },
       { status: 500 }
     );
   }
