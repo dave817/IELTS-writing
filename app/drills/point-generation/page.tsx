@@ -147,6 +147,27 @@ export default function PointGenerationDrill() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handleSubmitPoints = () => {
+    const filledPoints = points.filter(p => p.trim() !== "");
+    
+    if (filledPoints.length === 0) {
+      toast.error("Please enter at least one point before submitting.");
+      return;
+    }
+
+    if (filledPoints.length < 3) {
+      toast.warning(`You submitted ${filledPoints.length} point(s). Aim for 3 strong points!`);
+    } else {
+      toast.success("Great! You've generated 3 points.");
+    }
+
+    // Stop the timer
+    setIsRunning(false);
+    
+    // Show the points submitted
+    console.log("Submitted points:", filledPoints);
+  };
+
   return (
     <div className="container mx-auto py-6 h-[calc(100vh-100px)]">
       {/* Header */}
@@ -225,11 +246,14 @@ export default function PointGenerationDrill() {
                     value={point}
                     onChange={(e) => handlePointChange(idx, e.target.value)}
                     placeholder={`Enter strong point #${idx + 1}...`}
-                    disabled={!isRunning && timer > 0 && timer < 180} // Disabled if paused
                   />
                 </div>
               ))}
-              <Button className="w-full mt-4" disabled={!isRunning}>
+              <Button 
+                className="w-full mt-4" 
+                onClick={handleSubmitPoints}
+                disabled={points.every(p => p.trim() === "")}
+              >
                 <CheckCircle className="mr-2 h-4 w-4" /> Submit Points
               </Button>
             </CardContent>
