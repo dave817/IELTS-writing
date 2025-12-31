@@ -227,7 +227,7 @@ export async function POST(request: Request) {
         { role: "system", content: systemPrompt + "\n\nIMPORTANT: You must respond with valid JSON only, no markdown formatting, no code blocks, just pure JSON." },
         { role: "user", content: userMessage },
       ],
-      max_completion_tokens: 150000,
+      max_completion_tokens: 16000,
     });
 
     let feedbackText = response.choices[0]?.message?.content;
