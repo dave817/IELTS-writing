@@ -31,43 +31,8 @@ interface Template {
   isLocked: boolean;
 }
 
-interface FullFeedback {
-  task_response: {
-    prompt_addressed: boolean;
-    position_clarity: string;
-    development_issues: string[];
-    relevance_flags: string[];
-  };
-  coherence_cohesion: {
-    paragraph_structure: string;
-    cohesive_device_issues: string[];
-    logic_flow: {
-      coherent: boolean;
-      adequate: boolean;
-      consistent: boolean;
-      breaks: string[];
-    };
-  };
-  lexical_resource: {
-    precision_issues: string[];
-    collocation_errors: string[];
-    register_issues: string[];
-  };
-  grammar_accuracy: {
-    errors: string[];
-    range: string;
-  };
-  band_9_comparison: {
-    model: string;
-    key_differences: string[];
-    upgrade_suggestions: string[];
-  };
-  word_count: {
-    total: number;
-    meets_minimum: boolean;
-  };
-  overall_comment: string;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FullFeedback = Record<string, any>;
 
 interface SavedSession {
   text: string;
@@ -492,12 +457,14 @@ export default function TemplateFillDrill() {
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>AI Feedback - Full Essay Analysis</DialogTitle>
-            <DialogDescription>Comprehensive analysis by AI</DialogDescription>
+            <DialogDescription>
+              Estimated Band: <Badge variant="outline" className="ml-2">{feedback?.estimated_band || "N/A"}</Badge>
+            </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-4">
             {feedback && (
               <div className="space-y-6">
-                {/* Word Count */}
+                {/* Word Count & Band */}
                 <div className="flex items-center gap-4 p-4 rounded-lg bg-muted">
                   <div className="text-2xl font-bold">{feedback.word_count?.total || wordCount}</div>
                   <div>
@@ -509,80 +476,196 @@ export default function TemplateFillDrill() {
                 </div>
 
                 {/* Task Response */}
-                <div className="space-y-2">
+                <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.task_response?.prompt_addressed)}
+                    {getQualityIcon(feedback.task_response?.all_questions_answered)}
                     Task Response
                   </h3>
-                  <p className="text-sm">Position Clarity: {feedback.task_response?.position_clarity}</p>
-                  {feedback.task_response?.development_issues?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-yellow-700">
-                      {feedback.task_response.development_issues.map((issue, i) => (
-                        <li key={i}>{issue}</li>
-                      ))}
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <p><span className="text-muted-foreground">Position:</span> {feedback.task_response?.position_clarity}</p>
+                    <p><span className="text-muted-foreground">Stance:</span> {feedback.task_response?.stance_strength}</p>
+                    <p><span className="text-muted-foreground">Logic:</span> {feedback.task_response?.logic_strength}</p>
+                  </div>
+                  {feedback.task_response?.argument_methods_used?.length > 0 && (
+                    <p className="text-sm"><span className="text-muted-foreground">Methods:</span> {feedback.task_response.argument_methods_used.join(", ")}</p>
+                  )}
+                  {feedback.task_response?.development_analysis && (
+                    <p className="text-sm bg-muted/50 p-2 rounded">{feedback.task_response.development_analysis}</p>
+                  )}
+                  {feedback.task_response?.issues?.length > 0 && (
+                    <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
+                      {feedback.task_response.issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
                     </ul>
+                  )}
+                  {feedback.task_response?.comment && (
+                    <p className="text-sm italic text-muted-foreground">{feedback.task_response.comment}</p>
                   )}
                 </div>
 
                 {/* Coherence & Cohesion */}
-                <div className="space-y-2">
+                <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
                     {getQualityIcon(feedback.coherence_cohesion?.paragraph_structure)}
-                    Coherence & Cohesion ({feedback.coherence_cohesion?.paragraph_structure})
+                    Coherence & Cohesion
                   </h3>
-                  {feedback.coherence_cohesion?.logic_flow?.breaks?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-yellow-700">
-                      {feedback.coherence_cohesion.logic_flow.breaks.map((b, i) => (
-                        <li key={i}>{b}</li>
-                      ))}
-                    </ul>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <p><span className="text-muted-foreground">Flow:</span> {feedback.coherence_cohesion?.overall_flow}</p>
+                    <p><span className="text-muted-foreground">Structure:</span> {feedback.coherence_cohesion?.paragraph_structure}</p>
+                  </div>
+                  {feedback.coherence_cohesion?.paragraph_analysis && (
+                    <p className="text-sm bg-muted/50 p-2 rounded">{feedback.coherence_cohesion.paragraph_analysis}</p>
                   )}
-                  {feedback.coherence_cohesion?.cohesive_device_issues?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-red-600">
-                      {feedback.coherence_cohesion.cohesive_device_issues.map((issue, i) => (
-                        <li key={i}>{issue}</li>
-                      ))}
-                    </ul>
+                  {feedback.coherence_cohesion?.cohesive_devices?.issues?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Cohesive Device Issues:</p>
+                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
+                        {feedback.coherence_cohesion.cohesive_devices.issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.coherence_cohesion?.logic_flow_breaks?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Logic Breaks:</p>
+                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
+                        {feedback.coherence_cohesion.logic_flow_breaks.map((b: string, i: number) => <li key={i}>{b}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.coherence_cohesion?.comment && (
+                    <p className="text-sm italic text-muted-foreground">{feedback.coherence_cohesion.comment}</p>
                   )}
                 </div>
 
                 {/* Lexical Resource */}
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Lexical Resource</h3>
-                  {feedback.lexical_resource?.collocation_errors?.length > 0 && (
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    {getQualityIcon(feedback.lexical_resource?.range)}
+                    Lexical Resource
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <p><span className="text-muted-foreground">Range:</span> {feedback.lexical_resource?.range}</p>
+                    <p><span className="text-muted-foreground">Precision:</span> {feedback.lexical_resource?.precision}</p>
+                  </div>
+                  {feedback.lexical_resource?.vocabulary_highlights?.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Collocation Errors:</p>
-                      <ul className="list-disc list-inside text-sm text-red-600">
-                        {feedback.lexical_resource.collocation_errors.map((err, i) => (
-                          <li key={i}>{err}</li>
+                      <p className="text-xs text-muted-foreground">✓ Good Vocabulary:</p>
+                      <ul className="list-disc list-inside text-sm text-green-600 dark:text-green-400">
+                        {feedback.lexical_resource.vocabulary_highlights.map((h: {phrase?: string; why?: string} | string, i: number) => (
+                          <li key={i}>{typeof h === 'string' ? h : `"${h.phrase}" - ${h.why}`}</li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  {feedback.lexical_resource?.precision_issues?.length > 0 && (
+                  {feedback.lexical_resource?.collocation_errors?.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Precision Issues:</p>
-                      <ul className="list-disc list-inside text-sm text-yellow-700">
-                        {feedback.lexical_resource.precision_issues.map((issue, i) => (
-                          <li key={i}>{issue}</li>
+                      <p className="text-xs text-muted-foreground">✗ Collocation Errors:</p>
+                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
+                        {feedback.lexical_resource.collocation_errors.map((err: {error?: string; correction?: string} | string, i: number) => (
+                          <li key={i}>{typeof err === 'string' ? err : `"${err.error}" → "${err.correction}"`}</li>
                         ))}
                       </ul>
                     </div>
+                  )}
+                  {feedback.lexical_resource?.word_choice_improvements?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">💡 Improvements:</p>
+                      <ul className="list-disc list-inside text-sm text-blue-600 dark:text-blue-400">
+                        {feedback.lexical_resource.word_choice_improvements.map((w: {original?: string; better?: string; reason?: string} | string, i: number) => (
+                          <li key={i}>{typeof w === 'string' ? w : `"${w.original}" → "${w.better}" (${w.reason})`}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.lexical_resource?.formality_issues?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">⚠️ Formality Issues:</p>
+                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
+                        {feedback.lexical_resource.formality_issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.lexical_resource?.comment && (
+                    <p className="text-sm italic text-muted-foreground">{feedback.lexical_resource.comment}</p>
                   )}
                 </div>
 
-                {/* Grammar */}
-                <div className="space-y-2">
+                {/* Grammar Accuracy */}
+                <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
                     {getQualityIcon(feedback.grammar_accuracy?.range)}
-                    Grammar Accuracy ({feedback.grammar_accuracy?.range} range)
+                    Grammar Accuracy
                   </h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <p><span className="text-muted-foreground">Range:</span> {feedback.grammar_accuracy?.range}</p>
+                    <p><span className="text-muted-foreground">Variety:</span> {feedback.grammar_accuracy?.sentence_variety}</p>
+                    <p><span className="text-muted-foreground">Error Frequency:</span> {feedback.grammar_accuracy?.error_frequency}</p>
+                  </div>
+                  {feedback.grammar_accuracy?.highlights?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">✓ Well-constructed:</p>
+                      <ul className="list-disc list-inside text-sm text-green-600 dark:text-green-400">
+                        {feedback.grammar_accuracy.highlights.map((h: string, i: number) => <li key={i}>{h}</li>)}
+                      </ul>
+                    </div>
+                  )}
                   {feedback.grammar_accuracy?.errors?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-red-600">
-                      {feedback.grammar_accuracy.errors.map((err, i) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                    </ul>
+                    <div>
+                      <p className="text-xs text-muted-foreground">✗ Errors:</p>
+                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
+                        {feedback.grammar_accuracy.errors.map((err: {error?: string; correction?: string; type?: string} | string, i: number) => (
+                          <li key={i}>{typeof err === 'string' ? err : `[${err.type}] "${err.error}" → "${err.correction}"`}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.grammar_accuracy?.punctuation_issues?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">⚠️ Punctuation:</p>
+                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
+                        {feedback.grammar_accuracy.punctuation_issues.map((p: {issue?: string; correction?: string} | string, i: number) => (
+                          <li key={i}>{typeof p === 'string' ? p : `${p.issue} → ${p.correction}`}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.grammar_accuracy?.comment && (
+                    <p className="text-sm italic text-muted-foreground">{feedback.grammar_accuracy.comment}</p>
+                  )}
+                </div>
+
+                {/* Conclusion Quality */}
+                {feedback.conclusion_quality && (
+                  <div className="space-y-2 p-4 border rounded-lg">
+                    <h3 className="font-semibold">Conclusion Quality</h3>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <p>{feedback.conclusion_quality.summarizes_differently ? "✓" : "✗"} Summarizes differently</p>
+                      <p>{feedback.conclusion_quality.broadens_perspective ? "✓" : "✗"} Broadens perspective</p>
+                      <p>{feedback.conclusion_quality.avoids_new_info ? "✓" : "✗"} Avoids new info</p>
+                      <p>{feedback.conclusion_quality.is_concise ? "✓" : "✗"} Concise</p>
+                    </div>
+                    {feedback.conclusion_quality.comment && (
+                      <p className="text-sm italic text-muted-foreground">{feedback.conclusion_quality.comment}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Strengths & Improvements */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {feedback.overall_strengths?.length > 0 && (
+                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+                      <h4 className="font-semibold mb-2 text-green-700 dark:text-green-400">💪 Strengths</h4>
+                      <ul className="list-disc list-inside text-sm">
+                        {feedback.overall_strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.priority_improvements?.length > 0 && (
+                    <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
+                      <h4 className="font-semibold mb-2 text-blue-700 dark:text-blue-400">🎯 Priority Improvements</h4>
+                      <ol className="list-decimal list-inside text-sm">
+                        {feedback.priority_improvements.map((p: string, i: number) => <li key={i}>{p}</li>)}
+                      </ol>
+                    </div>
                   )}
                 </div>
 
@@ -591,39 +674,6 @@ export default function TemplateFillDrill() {
                   <h3 className="font-semibold mb-2">Overall Feedback</h3>
                   <p className="text-sm">{feedback.overall_comment}</p>
                 </div>
-
-                {/* Band 9 Comparison */}
-                {feedback.band_9_comparison && (
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Comparison with Band 9</h3>
-                    {feedback.band_9_comparison.key_differences?.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Key Differences:</p>
-                        <ul className="list-disc list-inside text-sm">
-                          {feedback.band_9_comparison.key_differences.map((diff, i) => (
-                            <li key={i}>{diff}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {feedback.band_9_comparison.upgrade_suggestions?.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Upgrade Suggestions:</p>
-                        <ul className="list-disc list-inside text-sm text-blue-600">
-                          {feedback.band_9_comparison.upgrade_suggestions.map((sug, i) => (
-                            <li key={i}>{sug}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {feedback.band_9_comparison.model && (
-                      <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                        <h4 className="font-semibold mb-2 text-green-700 dark:text-green-400">Band 9 Model Essay</h4>
-                        <p className="text-sm whitespace-pre-wrap">{feedback.band_9_comparison.model}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             )}
           </ScrollArea>
