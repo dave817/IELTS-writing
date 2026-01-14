@@ -242,25 +242,48 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("AI Feedback Error:", err);
     
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    const errorStack = err instanceof Error ? err.stack : undefined;
+    
+    // Log full error for debugging
+    console.error("Full error details:", {
+      message: errorMessage,
+      stack: errorStack,
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT?.slice(0, 30),
+      deployment: process.env.AZURE_OPENAI_DEPLOYMENT_NAME,
+      apiVersion: process.env.AZURE_OPENAI_API_VERSION,
+    });
+    
     // Differentiate between different error types
     if (err instanceof Error) {
       // Check for specific Azure OpenAI errors
-      if (err.message.includes("rate limit")) {
+      if (errorMessage.includes("rate limit")) {
         return NextResponse.json(
           { error: "AI service rate limit exceeded. Please wait a moment and try again." },
           { status: 429 }
         );
       }
-      if (err.message.includes("timeout") || err.message.includes("ETIMEDOUT")) {
+      if (errorMessage.includes("timeout") || errorMessage.includes("ETIMEDOUT")) {
         return NextResponse.json(
           { error: "AI service timeout. Your essay may be too long, or the service is busy." },
           { status: 504 }
         );
       }
-      if (err.message.includes("Invalid API Key") || err.message.includes("401")) {
-        console.error("API Key issue - check Azure OpenAI configuration");
+      if (errorMessage.includes("Invalid API Key") || errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
         return NextResponse.json(
-          { error: "AI service configuration error. Please contact support." },
+          { error: "AI service authentication failed. Check API key.", details: errorMessage },
+          { status: 401 }
+        );
+      }
+      if (errorMessage.includes("404") || errorMessage.includes("DeploymentNotFound") || errorMessage.includes("model")) {
+        return NextResponse.json(
+          { error: "AI model/deployment not found. Check AZURE_OPENAI_DEPLOYMENT_NAME.", details: errorMessage },
+          { status: 404 }
+        );
+      }
+      if (errorMessage.includes("AZURE_OPENAI_ENDPOINT") || errorMessage.includes("Missing")) {
+        return NextResponse.json(
+          { error: "Missing environment variable.", details: errorMessage },
           { status: 500 }
         );
       }
@@ -269,7 +292,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { 
         error: "Failed to get AI feedback. Please try again.",
-        details: err instanceof Error ? err.message : "Unknown error"
+        details: errorMessage,
       },
       { status: 500 }
     );
