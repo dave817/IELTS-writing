@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,7 +16,7 @@ import { RefreshCw, Send, FileText, Loader2, Clock, AlertCircle, AlertTriangle, 
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAutoSave, formatTimeSince } from "@/lib/hooks/use-auto-save";
-import { formatTime, getTimerColorClass, countWords, getQualityIcon } from "@/lib/drill-utils";
+import { formatTime, getTimerColorClass, countWords } from "@/lib/drill-utils";
 import { useDebounceSubmit } from "@/lib/hooks/use-api-request";
 
 interface Question {
@@ -31,9 +32,6 @@ interface Template {
   isLocked: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type FullFeedback = Record<string, any>;
-
 interface SavedSession {
   text: string;
   timer: number;
@@ -46,6 +44,7 @@ const MIN_WORDS = 500;
 const DRILL_TIME = 40 * 60; // 40 minutes in seconds
 
 export default function TemplateFillDrill() {
+  const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
@@ -54,8 +53,6 @@ export default function TemplateFillDrill() {
   const [text, setText] = useState("");
   const [timer, setTimer] = useState(DRILL_TIME);
   const [isRunning, setIsRunning] = useState(false);
-  const [feedback, setFeedback] = useState<FullFeedback | null>(null);
-  const [showFeedback, setShowFeedback] = useState(false);
   const [showLowWordWarning, setShowLowWordWarning] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
@@ -168,7 +165,6 @@ export default function TemplateFillDrill() {
     setTimer(DRILL_TIME);
     setIsRunning(true);
     setText("");
-    setFeedback(null);
   };
 
   const handleSubmit = () => {
@@ -204,10 +200,16 @@ export default function TemplateFillDrill() {
           throw new Error(errorData.error || "Failed to get feedback");
         }
         const data = await res.json();
-        setFeedback(data.feedback);
-        setShowFeedback(true);
+        
+        // Store feedback in sessionStorage and navigate to feedback page
+        sessionStorage.setItem("ielts-feedback", JSON.stringify(data.feedback));
+        sessionStorage.setItem("ielts-word-count", String(wordCount));
+        
         setIsRunning(false);
         clear();
+        
+        // Navigate to feedback page
+        router.push("/drills/feedback");
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to get AI feedback";
         toast.error(message);
@@ -452,155 +454,6 @@ export default function TemplateFillDrill() {
         </DialogContent>
       </Dialog>
 
-      {/* Feedback Dialog */}
-      <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle>AI Feedback - Full Essay Analysis</DialogTitle>
-            <DialogDescription>
-              Estimated Band: <Badge variant="outline" className="ml-2">{feedback?.estimated_band || "N/A"}</Badge>
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[70vh] pr-4">
-            {feedback && (
-              <div className="space-y-6">
-                {/* Word Count & Band */}
-                <div className="flex items-center gap-4 p-4 rounded-lg bg-muted">
-                  <div className="text-2xl font-bold">{feedback.word_count?.total || wordCount}</div>
-                  <div>
-                    <p className="font-medium">Total Words</p>
-                    <p className={`text-sm ${feedback.word_count?.meets_minimum ? "text-green-600" : "text-red-500"}`}>
-                      {feedback.word_count?.meets_minimum ? "✓ Meets minimum" : "✗ Below minimum"}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Task Response */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.task_response_score)}
-                    Task Response
-                    <Badge variant="outline" className="ml-auto">{feedback.task_response_score || "N/A"}</Badge>
-                  </h3>
-                  <div className="bg-muted/50 p-3 rounded-lg">
-                    <p className="text-sm">{feedback.task_response_comment || "No analysis provided"}</p>
-                  </div>
-                  {feedback.task_response_issues?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Issues Found:</p>
-                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
-                        {feedback.task_response_issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* Coherence & Cohesion */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.coherence_score)}
-                    Coherence & Cohesion
-                    <Badge variant="outline" className="ml-auto">{feedback.coherence_score || "N/A"}</Badge>
-                  </h3>
-                  <div className="bg-muted/50 p-3 rounded-lg">
-                    <p className="text-sm">{feedback.coherence_comment || "No analysis provided"}</p>
-                  </div>
-                  {feedback.coherence_issues?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Issues Found:</p>
-                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
-                        {feedback.coherence_issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* Lexical Resource */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.lexical_score)}
-                    Lexical Resource
-                    <Badge variant="outline" className="ml-auto">{feedback.lexical_score || "N/A"}</Badge>
-                  </h3>
-                  <div className="bg-muted/50 p-3 rounded-lg">
-                    <p className="text-sm">{feedback.lexical_comment || "No analysis provided"}</p>
-                  </div>
-                  {feedback.lexical_good?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">✓ Good Vocabulary:</p>
-                      <ul className="list-disc list-inside text-sm text-green-600 dark:text-green-400">
-                        {feedback.lexical_good.map((v: string, i: number) => <li key={i}>{v}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {feedback.lexical_errors?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">✗ Errors:</p>
-                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
-                        {feedback.lexical_errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* Grammar Accuracy */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.grammar_score)}
-                    Grammar Accuracy
-                    <Badge variant="outline" className="ml-auto">{feedback.grammar_score || "N/A"}</Badge>
-                  </h3>
-                  <div className="bg-muted/50 p-3 rounded-lg">
-                    <p className="text-sm">{feedback.grammar_comment || "No analysis provided"}</p>
-                  </div>
-                  {feedback.grammar_good?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">✓ Well-constructed:</p>
-                      <ul className="list-disc list-inside text-sm text-green-600 dark:text-green-400">
-                        {feedback.grammar_good.map((s: string, i: number) => <li key={i}>{s}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {feedback.grammar_errors?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">✗ Errors:</p>
-                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
-                        {feedback.grammar_errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-
-                {/* Strengths & Improvements */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(feedback.strengths?.length > 0 || feedback.overall_strengths?.length > 0) && (
-                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                      <h4 className="font-semibold mb-2 text-green-700 dark:text-green-400">💪 Strengths</h4>
-                      <ul className="list-disc list-inside text-sm">
-                        {(feedback.strengths || feedback.overall_strengths || []).map((s: string, i: number) => <li key={i}>{s}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                  {(feedback.improvements?.length > 0 || feedback.priority_improvements?.length > 0) && (
-                    <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
-                      <h4 className="font-semibold mb-2 text-blue-700 dark:text-blue-400">🎯 Priority Improvements</h4>
-                      <ol className="list-decimal list-inside text-sm">
-                        {(feedback.improvements || feedback.priority_improvements || []).map((p: string, i: number) => <li key={i}>{p}</li>)}
-                      </ol>
-                    </div>
-                  )}
-                </div>
-
-                {/* Overall Comment */}
-                <div className="p-4 bg-muted rounded-lg">
-                  <h3 className="font-semibold mb-2">Overall Feedback</h3>
-                  <p className="text-sm">{feedback.overall_comment}</p>
-                </div>
-              </div>
-            )}
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
