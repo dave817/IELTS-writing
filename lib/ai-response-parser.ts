@@ -48,8 +48,77 @@ function attemptJsonFix(text: string): string {
   fixed = fixed.replace(/,\s*([}\]])/g, "$1");
   
   // Try to fix unquoted property names (common LLM mistake)
-  // This is a simplified fix that handles basic cases
   fixed = fixed.replace(/([{,]\s*)(\w+)(\s*:)/g, '$1"$2"$3');
+  
+  return fixed;
+}
+
+/**
+ * Attempt to repair truncated JSON by adding missing closing brackets
+ */
+function repairTruncatedJson(text: string): string {
+  let fixed = text.trim();
+  
+  // Count open brackets
+  let openBraces = 0;
+  let openBrackets = 0;
+  let inString = false;
+  let prevChar = '';
+  
+  for (const char of fixed) {
+    if (char === '"' && prevChar !== '\\') {
+      inString = !inString;
+    } else if (!inString) {
+      if (char === '{') openBraces++;
+      if (char === '}') openBraces--;
+      if (char === '[') openBrackets++;
+      if (char === ']') openBrackets--;
+    }
+    prevChar = char;
+  }
+  
+  // If we're in a string, try to close it
+  if (inString) {
+    // Find the last quote and truncate there, or add a closing quote
+    fixed = fixed + '"';
+    inString = false;
+  }
+  
+  // Remove any trailing incomplete content after the last complete value
+  // Try to find a good truncation point
+  const lastGoodPoints = [
+    fixed.lastIndexOf('",'),
+    fixed.lastIndexOf('"},'),
+    fixed.lastIndexOf('"]'),
+    fixed.lastIndexOf('"}'),
+    fixed.lastIndexOf('" }'),
+    fixed.lastIndexOf('true,'),
+    fixed.lastIndexOf('false,'),
+    fixed.lastIndexOf('null,'),
+  ].filter(i => i > 0);
+  
+  if (lastGoodPoints.length > 0) {
+    const bestPoint = Math.max(...lastGoodPoints);
+    // Check if we need to truncate
+    const remaining = fixed.slice(bestPoint);
+    if (remaining.includes('"') && !remaining.match(/^",?\s*[\]}]/)) {
+      // There's an incomplete string after the last good point
+      fixed = fixed.slice(0, bestPoint + 2); // Include the ", or "}
+    }
+  }
+  
+  // Remove trailing comma if present
+  fixed = fixed.replace(/,\s*$/, '');
+  
+  // Add missing closing brackets
+  while (openBrackets > 0) {
+    fixed += ']';
+    openBrackets--;
+  }
+  while (openBraces > 0) {
+    fixed += '}';
+    openBraces--;
+  }
   
   return fixed;
 }
@@ -92,8 +161,24 @@ export function parseAIResponse<T>(responseText: string | null | undefined): Par
       const data = JSON.parse(jsonMatch[0]) as T;
       return { success: true, data, rawText };
     } catch {
-      // Continue
+      // Try to repair truncated JSON
+      try {
+        const repairedText = repairTruncatedJson(jsonMatch[0]);
+        const data = JSON.parse(repairedText) as T;
+        return { success: true, data, rawText };
+      } catch {
+        // Continue
+      }
     }
+  }
+
+  // Fourth attempt: try to repair the entire text
+  try {
+    const repairedText = repairTruncatedJson(attemptJsonFix(text));
+    const data = JSON.parse(repairedText) as T;
+    return { success: true, data, rawText };
+  } catch {
+    // All attempts failed
   }
 
   // All attempts failed
@@ -182,4 +267,3 @@ export function createFallbackFeedback(rawText: string, drillType: string): Reco
       };
   }
 }
-
