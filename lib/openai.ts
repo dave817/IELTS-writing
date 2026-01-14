@@ -5,7 +5,7 @@ import { AzureOpenAI } from "openai";
 const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
 const apiKey = process.env.AZURE_OPENAI_API_KEY;
 const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT;
-const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview";
+const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview";
 
 // Lazy initialization to avoid build-time errors
 let _openai: AzureOpenAI | null = null;
@@ -36,11 +36,11 @@ export function getOpenAIClient(): AzureOpenAI {
     );
   }
 
+  // Note: deployment is NOT passed to constructor - it's passed to each API call as 'model'
   _openai = new AzureOpenAI({
     endpoint,
     apiKey,
     apiVersion,
-    deployment,
   });
 
   return _openai;
@@ -52,12 +52,3 @@ export function getDeploymentName(): string {
   }
   return deployment;
 }
-
-// For backwards compatibility - but these will throw at runtime if env vars missing
-export const openai = {
-  get chat() {
-    return getOpenAIClient().chat;
-  }
-};
-
-export { deployment };
