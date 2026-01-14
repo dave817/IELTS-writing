@@ -722,195 +722,225 @@ In conclusion, while both sides present valid arguments..."
       {/* Feedback Dialog */}
       <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              Full Essay Feedback
-              {feedback?.estimated_band && (
-                <Badge variant="secondary" className="text-lg">
-                  Band: {feedback.estimated_band}
-                </Badge>
-              )}
-            </DialogTitle>
-            <DialogDescription>Comprehensive AI analysis of your essay</DialogDescription>
+          <DialogHeader className="pb-2">
+            <DialogTitle>Essay Feedback</DialogTitle>
+            <DialogDescription>Comprehensive AI analysis of your IELTS Writing Task 2</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-4">
             {feedback && (
-              <div className="space-y-6">
-                {/* Word Count */}
-                <div className="flex items-center gap-4 p-4 rounded-lg bg-muted">
-                  <div className="text-2xl font-bold">{feedback.word_count?.total || wordCount}</div>
-                  <div>
-                    <p className="font-medium">Total Words</p>
-                    <p
-                      className={`text-sm ${
-                        feedback.word_count?.meets_minimum ? "text-green-600" : "text-red-500"
-                      }`}
-                    >
-                      {feedback.word_count?.meets_minimum ? "✓ Meets minimum (250)" : "✗ Below minimum"}
-                    </p>
+              <div className="space-y-4">
+                {/* Summary Header */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Word Count */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border">
+                    <div className="text-3xl font-bold tabular-nums">{feedback.word_count?.total || wordCount}</div>
+                    <div>
+                      <p className="text-sm font-medium">Words</p>
+                      <p className={`text-xs ${feedback.word_count?.meets_minimum ? "text-green-600" : "text-red-500"}`}>
+                        {feedback.word_count?.meets_minimum ? "✓ Meets minimum" : "✗ Below 250"}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Band Score */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-200 dark:border-purple-800">
+                    <div className="text-3xl font-bold text-purple-700 dark:text-purple-400">
+                      {/* Extract just the band number */}
+                      {feedback.estimated_band?.match(/\d+\.?\d*[-–]?\d*\.?\d*/)?.[0] || feedback.estimated_band?.slice(0, 10) || "N/A"}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Est. Band</p>
+                      {feedback.estimated_band && feedback.estimated_band.includes("(") && (
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {feedback.estimated_band.match(/\(([^)]+)\)/)?.[1] || ""}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Task Response */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.task_response_score)}
-                    Task Response
-                    {feedback.task_response_score && (
-                      <Badge variant="outline">{feedback.task_response_score}</Badge>
-                    )}
-                  </h3>
-                  {feedback.task_response_comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.task_response_comment}</p>
+                {/* 4 Criteria Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Task Response */}
+                  <div className={`space-y-2 p-4 rounded-lg border-l-4 ${
+                    feedback.task_response_score === "good" ? "border-l-green-500 bg-green-50/30 dark:bg-green-950/20" :
+                    feedback.task_response_score === "adequate" ? "border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/20" :
+                    "border-l-red-500 bg-red-50/30 dark:bg-red-950/20"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm flex items-center gap-2">
+                        {getQualityIcon(feedback.task_response_score)}
+                        Task Response
+                      </h3>
+                      {feedback.task_response_score && (
+                        <Badge variant="outline" className="text-xs capitalize">{feedback.task_response_score}</Badge>
+                      )}
                     </div>
-                  )}
-                  {feedback.task_response_issues?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Issues:</p>
-                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
-                        {feedback.task_response_issues.map((issue: string, i: number) => (
-                          <li key={i}>{issue}</li>
+                    {feedback.task_response_comment && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">{feedback.task_response_comment}</p>
+                    )}
+                    {feedback.task_response_issues?.length > 0 && (
+                      <ul className="text-xs space-y-1 mt-2">
+                        {feedback.task_response_issues.slice(0, 3).map((issue: string, i: number) => (
+                          <li key={i} className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                            <span className="mt-1">•</span>
+                            <span>{issue}</span>
+                          </li>
                         ))}
                       </ul>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                {/* Coherence & Cohesion */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.coherence_score)}
-                    Coherence & Cohesion
-                    {feedback.coherence_score && (
-                      <Badge variant="outline">{feedback.coherence_score}</Badge>
-                    )}
-                  </h3>
-                  {feedback.coherence_comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.coherence_comment}</p>
+                  {/* Coherence & Cohesion */}
+                  <div className={`space-y-2 p-4 rounded-lg border-l-4 ${
+                    feedback.coherence_score === "good" ? "border-l-green-500 bg-green-50/30 dark:bg-green-950/20" :
+                    feedback.coherence_score === "adequate" ? "border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/20" :
+                    "border-l-red-500 bg-red-50/30 dark:bg-red-950/20"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm flex items-center gap-2">
+                        {getQualityIcon(feedback.coherence_score)}
+                        Coherence & Cohesion
+                      </h3>
+                      {feedback.coherence_score && (
+                        <Badge variant="outline" className="text-xs capitalize">{feedback.coherence_score}</Badge>
+                      )}
                     </div>
-                  )}
-                  {feedback.coherence_issues?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Issues:</p>
-                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
-                        {feedback.coherence_issues.map((issue: string, i: number) => (
-                          <li key={i}>{issue}</li>
+                    {feedback.coherence_comment && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">{feedback.coherence_comment}</p>
+                    )}
+                    {feedback.coherence_issues?.length > 0 && (
+                      <ul className="text-xs space-y-1 mt-2">
+                        {feedback.coherence_issues.slice(0, 3).map((issue: string, i: number) => (
+                          <li key={i} className="flex items-start gap-1.5 text-amber-700 dark:text-amber-400">
+                            <span className="mt-1">•</span>
+                            <span>{issue}</span>
+                          </li>
                         ))}
                       </ul>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                {/* Lexical Resource */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.lexical_score)}
-                    Lexical Resource
-                    {feedback.lexical_score && (
-                      <Badge variant="outline">{feedback.lexical_score}</Badge>
+                  {/* Lexical Resource */}
+                  <div className={`space-y-2 p-4 rounded-lg border-l-4 ${
+                    feedback.lexical_score === "good" ? "border-l-green-500 bg-green-50/30 dark:bg-green-950/20" :
+                    feedback.lexical_score === "adequate" ? "border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/20" :
+                    "border-l-red-500 bg-red-50/30 dark:bg-red-950/20"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm flex items-center gap-2">
+                        {getQualityIcon(feedback.lexical_score)}
+                        Lexical Resource
+                      </h3>
+                      {feedback.lexical_score && (
+                        <Badge variant="outline" className="text-xs capitalize">{feedback.lexical_score}</Badge>
+                      )}
+                    </div>
+                    {feedback.lexical_comment && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">{feedback.lexical_comment}</p>
                     )}
-                  </h3>
-                  {feedback.lexical_comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.lexical_comment}</p>
-                    </div>
-                  )}
-                  {feedback.lexical_good?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Good Vocabulary:</p>
-                      <ul className="list-disc list-inside text-sm text-green-700 dark:text-green-400">
-                        {feedback.lexical_good.map((item: string, i: number) => (
-                          <li key={i}>{item}</li>
+                    {feedback.lexical_good?.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {feedback.lexical_good.slice(0, 4).map((item: string, i: number) => (
+                          <Badge key={i} variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                            {item}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {feedback.lexical_errors?.length > 0 && (
+                      <ul className="text-xs space-y-1 mt-2">
+                        {feedback.lexical_errors.slice(0, 2).map((err: string, i: number) => (
+                          <li key={i} className="text-red-600 dark:text-red-400">• {err}</li>
                         ))}
                       </ul>
-                    </div>
-                  )}
-                  {feedback.lexical_errors?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Errors:</p>
-                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
-                        {feedback.lexical_errors.map((err: string, i: number) => (
-                          <li key={i}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                {/* Grammar */}
-                <div className="space-y-3 p-4 border rounded-lg">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.grammar_score)}
-                    Grammar Accuracy
-                    {feedback.grammar_score && (
-                      <Badge variant="outline">{feedback.grammar_score}</Badge>
+                  {/* Grammar Accuracy */}
+                  <div className={`space-y-2 p-4 rounded-lg border-l-4 ${
+                    feedback.grammar_score === "good" ? "border-l-green-500 bg-green-50/30 dark:bg-green-950/20" :
+                    feedback.grammar_score === "adequate" ? "border-l-yellow-500 bg-yellow-50/30 dark:bg-yellow-950/20" :
+                    "border-l-red-500 bg-red-50/30 dark:bg-red-950/20"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-sm flex items-center gap-2">
+                        {getQualityIcon(feedback.grammar_score)}
+                        Grammar Accuracy
+                      </h3>
+                      {feedback.grammar_score && (
+                        <Badge variant="outline" className="text-xs capitalize">{feedback.grammar_score}</Badge>
+                      )}
+                    </div>
+                    {feedback.grammar_comment && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">{feedback.grammar_comment}</p>
                     )}
-                  </h3>
-                  {feedback.grammar_comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.grammar_comment}</p>
-                    </div>
-                  )}
-                  {feedback.grammar_good?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Well-constructed Sentences:</p>
-                      <ul className="list-disc list-inside text-sm text-green-700 dark:text-green-400">
-                        {feedback.grammar_good.map((item: string, i: number) => (
-                          <li key={i}>{item}</li>
+                    {feedback.grammar_good?.length > 0 && (
+                      <div className="text-xs mt-2 p-2 bg-green-100/50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
+                        <p className="text-green-700 dark:text-green-400 italic">"{feedback.grammar_good[0]}"</p>
+                      </div>
+                    )}
+                    {feedback.grammar_errors?.length > 0 && (
+                      <ul className="text-xs space-y-1 mt-2">
+                        {feedback.grammar_errors.slice(0, 2).map((err: string, i: number) => (
+                          <li key={i} className="text-red-600 dark:text-red-400">• {err}</li>
                         ))}
                       </ul>
-                    </div>
-                  )}
-                  {feedback.grammar_errors?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Errors:</p>
-                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
-                        {feedback.grammar_errors.map((err: string, i: number) => (
-                          <li key={i}>{err}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* Strengths & Improvements */}
-                <div className="grid grid-cols-2 gap-4">
-                  {feedback.strengths?.length > 0 && (
-                    <div className="p-4 border border-green-200 dark:border-green-800 rounded-lg bg-green-50/50 dark:bg-green-950/20">
-                      <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">Strengths</h4>
-                      <ul className="list-disc list-inside text-sm">
-                        {feedback.strengths.map((s: string, i: number) => (
-                          <li key={i}>{s}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {feedback.improvements?.length > 0 && (
-                    <div className="p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
-                      <h4 className="font-semibold text-blue-700 dark:text-blue-400 mb-2">Priority Improvements</h4>
-                      <ol className="list-decimal list-inside text-sm">
-                        {feedback.improvements.map((p: string, i: number) => (
-                          <li key={i}>{p}</li>
-                        ))}
-                      </ol>
-                    </div>
-                  )}
-                </div>
+                {(feedback.strengths?.length > 0 || feedback.improvements?.length > 0) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {feedback.strengths?.length > 0 && (
+                      <div className="p-4 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800">
+                        <h4 className="font-semibold text-sm text-green-700 dark:text-green-400 mb-2 flex items-center gap-2">
+                          ✨ Strengths
+                        </h4>
+                        <ul className="text-sm space-y-1">
+                          {feedback.strengths.map((s: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-green-500 mt-0.5">✓</span>
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {feedback.improvements?.length > 0 && (
+                      <div className="p-4 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800">
+                        <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-400 mb-2 flex items-center gap-2">
+                          🎯 Priority Improvements
+                        </h4>
+                        <ol className="text-sm space-y-1">
+                          {feedback.improvements.map((p: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-blue-500 font-bold">{i + 1}.</span>
+                              <span>{p}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Overall Comment */}
-                <div className="p-4 bg-muted rounded-lg">
-                  <h3 className="font-semibold mb-2">Overall Feedback</h3>
-                  <p className="text-sm whitespace-pre-wrap">{feedback.overall_comment || "No overall feedback provided."}</p>
-                </div>
+                {feedback.overall_comment && (
+                  <div className="p-4 rounded-lg bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-900/50 dark:to-gray-900/50 border">
+                    <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                      📝 Overall Assessment
+                    </h3>
+                    <p className="text-sm leading-relaxed">{feedback.overall_comment}</p>
+                  </div>
+                )}
 
                 {/* Debug: Raw Response */}
-                <details className="text-xs">
+                <details className="text-xs border-t pt-4 mt-4">
                   <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                     View Raw AI Response (debug)
                   </summary>
-                  <pre className="mt-2 p-3 bg-muted rounded-lg overflow-auto max-h-48">
+                  <pre className="mt-2 p-3 bg-muted rounded-lg overflow-auto max-h-48 text-[10px]">
                     {JSON.stringify(feedback, null, 2)}
                   </pre>
                 </details>
