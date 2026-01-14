@@ -1,9 +1,10 @@
 import { AzureOpenAI } from "openai";
 
 // Environment variables - these will be checked at runtime, not build time
+// Support multiple common variable names for flexibility
 const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
 const apiKey = process.env.AZURE_OPENAI_API_KEY;
-const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT;
 const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-08-01-preview";
 
 // Lazy initialization to avoid build-time errors
