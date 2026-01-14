@@ -236,53 +236,36 @@ Instructions:
 - Check prioritization of information (詳略得當)
 `,
 
-  template_fill: `You are an expert IELTS Writing Task 2 examiner.
+  template_fill: `IELTS Task 2 examiner. Analyze the essay and return JSON with detailed feedback for ALL 4 criteria.
 
-IMPORTANT: You MUST provide detailed comments for EACH of the 4 criteria. Do not leave any comment field empty.
-
-Return this EXACT JSON structure:
 {
-  "word_count": {"total": 0, "meets_minimum": true},
-  "estimated_band": "8-9 or 7-8 or 6-7 or below6",
+  "word_count": {"total": NUMBER, "meets_minimum": BOOLEAN},
+  "estimated_band": "STRING",
   
-  "task_response": {
-    "score_indicator": "good or adequate or weak",
-    "position_clarity": "clear or vague or missing",
-    "all_questions_answered": true,
-    "issues": ["list specific issues found"],
-    "comment": "REQUIRED: Write 3-4 sentences analyzing how well the essay addresses the prompt, the clarity of position, and argument development quality."
-  },
+  "task_response_comment": "WRITE 3-4 SENTENCES: Analyze how well the essay addresses the prompt. Discuss position clarity, argument development, and whether all questions are answered.",
+  "task_response_score": "good/adequate/weak",
+  "task_response_issues": ["issue1", "issue2"],
   
-  "coherence_cohesion": {
-    "score_indicator": "good or adequate or weak", 
-    "paragraph_structure": "skillful or adequate or weak",
-    "flow": "smooth or adequate or choppy",
-    "issues": ["list specific cohesion issues"],
-    "comment": "REQUIRED: Write 3-4 sentences analyzing paragraph organization, use of cohesive devices, and logical flow."
-  },
+  "coherence_comment": "WRITE 3-4 SENTENCES: Analyze paragraph organization, logical flow, and use of cohesive devices. Discuss how ideas connect.",
+  "coherence_score": "good/adequate/weak",
+  "coherence_issues": ["issue1", "issue2"],
   
-  "lexical_resource": {
-    "score_indicator": "good or adequate or weak",
-    "range": "wide or adequate or limited",
-    "good_vocabulary": ["list 2-3 good words/phrases used"],
-    "errors": ["list vocabulary errors with corrections"],
-    "comment": "REQUIRED: Write 3-4 sentences analyzing vocabulary range, precision, and appropriateness for academic writing."
-  },
+  "lexical_comment": "WRITE 3-4 SENTENCES: Analyze vocabulary range, word choice precision, and academic appropriateness. Give specific examples.",
+  "lexical_score": "good/adequate/weak",
+  "lexical_good": ["good phrase 1", "good phrase 2"],
+  "lexical_errors": ["error → correction"],
   
-  "grammar_accuracy": {
-    "score_indicator": "good or adequate or weak",
-    "range": "wide or adequate or limited",
-    "good_sentences": ["quote 1-2 well-constructed sentences"],
-    "errors": ["list grammar errors with corrections"],
-    "comment": "REQUIRED: Write 3-4 sentences analyzing grammatical range, accuracy, and sentence variety."
-  },
+  "grammar_comment": "WRITE 3-4 SENTENCES: Analyze grammatical range, accuracy, and sentence variety. Quote specific examples.",
+  "grammar_score": "good/adequate/weak",
+  "grammar_good": ["well-constructed sentence"],
+  "grammar_errors": ["error → correction"],
   
-  "overall_strengths": ["strength 1", "strength 2"],
-  "priority_improvements": ["improvement 1", "improvement 2", "improvement 3"],
-  "overall_comment": "4-5 sentences of comprehensive feedback summarizing the essay quality."
+  "strengths": ["strength1", "strength2"],
+  "improvements": ["priority1", "priority2", "priority3"],
+  "overall_comment": "WRITE 4-5 SENTENCES: Comprehensive summary of essay quality."
 }
 
-CRITICAL: Every "comment" field MUST contain 3-4 detailed sentences. Do not skip any comment field.`,
+ALL comment fields are MANDATORY. Write detailed analysis, not just labels.`,
 };
 
 export async function POST(request: Request) {

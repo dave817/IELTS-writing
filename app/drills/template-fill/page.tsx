@@ -478,24 +478,19 @@ export default function TemplateFillDrill() {
                 {/* Task Response */}
                 <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.task_response?.score_indicator)}
+                    {getQualityIcon(feedback.task_response_score)}
                     Task Response
+                    <Badge variant="outline" className="ml-auto">{feedback.task_response_score || "N/A"}</Badge>
                   </h3>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <Badge variant="outline">Position: {feedback.task_response?.position_clarity || "N/A"}</Badge>
-                    <Badge variant="outline">Questions Answered: {feedback.task_response?.all_questions_answered ? "Yes" : "No"}</Badge>
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-sm">{feedback.task_response_comment || "No analysis provided"}</p>
                   </div>
-                  {feedback.task_response?.issues?.length > 0 && (
+                  {feedback.task_response_issues?.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Issues:</p>
+                      <p className="text-xs text-muted-foreground mb-1">Issues Found:</p>
                       <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
-                        {feedback.task_response.issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
+                        {feedback.task_response_issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
                       </ul>
-                    </div>
-                  )}
-                  {feedback.task_response?.comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.task_response.comment}</p>
                     </div>
                   )}
                 </div>
@@ -503,24 +498,19 @@ export default function TemplateFillDrill() {
                 {/* Coherence & Cohesion */}
                 <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.coherence_cohesion?.score_indicator)}
+                    {getQualityIcon(feedback.coherence_score)}
                     Coherence & Cohesion
+                    <Badge variant="outline" className="ml-auto">{feedback.coherence_score || "N/A"}</Badge>
                   </h3>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <Badge variant="outline">Structure: {feedback.coherence_cohesion?.paragraph_structure || "N/A"}</Badge>
-                    <Badge variant="outline">Flow: {feedback.coherence_cohesion?.flow || "N/A"}</Badge>
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-sm">{feedback.coherence_comment || "No analysis provided"}</p>
                   </div>
-                  {feedback.coherence_cohesion?.issues?.length > 0 && (
+                  {feedback.coherence_issues?.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground mb-1">Issues:</p>
+                      <p className="text-xs text-muted-foreground mb-1">Issues Found:</p>
                       <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
-                        {feedback.coherence_cohesion.issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
+                        {feedback.coherence_issues.map((issue: string, i: number) => <li key={i}>{issue}</li>)}
                       </ul>
-                    </div>
-                  )}
-                  {feedback.coherence_cohesion?.comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.coherence_cohesion.comment}</p>
                     </div>
                   )}
                 </div>
@@ -528,31 +518,27 @@ export default function TemplateFillDrill() {
                 {/* Lexical Resource */}
                 <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.lexical_resource?.score_indicator)}
+                    {getQualityIcon(feedback.lexical_score)}
                     Lexical Resource
+                    <Badge variant="outline" className="ml-auto">{feedback.lexical_score || "N/A"}</Badge>
                   </h3>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <Badge variant="outline">Range: {feedback.lexical_resource?.range || "N/A"}</Badge>
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-sm">{feedback.lexical_comment || "No analysis provided"}</p>
                   </div>
-                  {feedback.lexical_resource?.good_vocabulary?.length > 0 && (
+                  {feedback.lexical_good?.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">✓ Good Vocabulary:</p>
                       <ul className="list-disc list-inside text-sm text-green-600 dark:text-green-400">
-                        {feedback.lexical_resource.good_vocabulary.map((v: string, i: number) => <li key={i}>{v}</li>)}
+                        {feedback.lexical_good.map((v: string, i: number) => <li key={i}>{v}</li>)}
                       </ul>
                     </div>
                   )}
-                  {feedback.lexical_resource?.errors?.length > 0 && (
+                  {feedback.lexical_errors?.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">✗ Errors:</p>
                       <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
-                        {feedback.lexical_resource.errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
+                        {feedback.lexical_errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
                       </ul>
-                    </div>
-                  )}
-                  {feedback.lexical_resource?.comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.lexical_resource.comment}</p>
                     </div>
                   )}
                 </div>
@@ -560,50 +546,46 @@ export default function TemplateFillDrill() {
                 {/* Grammar Accuracy */}
                 <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.grammar_accuracy?.score_indicator)}
+                    {getQualityIcon(feedback.grammar_score)}
                     Grammar Accuracy
+                    <Badge variant="outline" className="ml-auto">{feedback.grammar_score || "N/A"}</Badge>
                   </h3>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <Badge variant="outline">Range: {feedback.grammar_accuracy?.range || "N/A"}</Badge>
+                  <div className="bg-muted/50 p-3 rounded-lg">
+                    <p className="text-sm">{feedback.grammar_comment || "No analysis provided"}</p>
                   </div>
-                  {feedback.grammar_accuracy?.good_sentences?.length > 0 && (
+                  {feedback.grammar_good?.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">✓ Well-constructed:</p>
                       <ul className="list-disc list-inside text-sm text-green-600 dark:text-green-400">
-                        {feedback.grammar_accuracy.good_sentences.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                        {feedback.grammar_good.map((s: string, i: number) => <li key={i}>{s}</li>)}
                       </ul>
                     </div>
                   )}
-                  {feedback.grammar_accuracy?.errors?.length > 0 && (
+                  {feedback.grammar_errors?.length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">✗ Errors:</p>
                       <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
-                        {feedback.grammar_accuracy.errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
+                        {feedback.grammar_errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
                       </ul>
-                    </div>
-                  )}
-                  {feedback.grammar_accuracy?.comment && (
-                    <div className="bg-muted/50 p-3 rounded-lg">
-                      <p className="text-sm">{feedback.grammar_accuracy.comment}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Strengths & Improvements */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {feedback.overall_strengths?.length > 0 && (
+                  {(feedback.strengths?.length > 0 || feedback.overall_strengths?.length > 0) && (
                     <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
                       <h4 className="font-semibold mb-2 text-green-700 dark:text-green-400">💪 Strengths</h4>
                       <ul className="list-disc list-inside text-sm">
-                        {feedback.overall_strengths.map((s: string, i: number) => <li key={i}>{s}</li>)}
+                        {(feedback.strengths || feedback.overall_strengths || []).map((s: string, i: number) => <li key={i}>{s}</li>)}
                       </ul>
                     </div>
                   )}
-                  {feedback.priority_improvements?.length > 0 && (
+                  {(feedback.improvements?.length > 0 || feedback.priority_improvements?.length > 0) && (
                     <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
                       <h4 className="font-semibold mb-2 text-blue-700 dark:text-blue-400">🎯 Priority Improvements</h4>
                       <ol className="list-decimal list-inside text-sm">
-                        {feedback.priority_improvements.map((p: string, i: number) => <li key={i}>{p}</li>)}
+                        {(feedback.improvements || feedback.priority_improvements || []).map((p: string, i: number) => <li key={i}>{p}</li>)}
                       </ol>
                     </div>
                   )}
