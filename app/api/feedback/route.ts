@@ -3,172 +3,24 @@ import { getOpenAIClient, getDeploymentName } from "@/lib/openai";
 import { parseAIResponse, createFallbackFeedback } from "@/lib/ai-response-parser";
 
 const SYSTEM_PROMPTS: Record<string, string> = {
-  opening: `You are an expert IELTS examiner. Analyze the opening paragraph concisely.
+  opening: `IELTS examiner. Return ONLY JSON:
+{"hook":{"type":"controversy|example|definition|rephrasing","quality":"good|ok|weak"},"thesis":{"clarity":"clear|vague|missing","answers_prompt":true},"errors":["max 2"],"comment":"1-2 sentences","improvement":"one suggestion"}`,
 
-Return STRICT JSON only:
-{
-  "hook": {
-    "type": "controversy|example|definition|comparison|rephrasing",
-    "effectiveness": "engaging|good|adequate|weak",
-    "comment": "brief feedback"
-  },
-  "thesis": {
-    "clarity": "clear|vague|missing",
-    "answers_prompt": true|false,
-    "comment": "brief feedback"
-  },
-  "language": {
-    "level": "sophisticated|adequate|limited",
-    "errors": ["error1"],
-    "highlights": ["good phrase"]
-  },
-  "overall_comment": "2-3 sentences of key feedback",
-  "one_sentence_improvement": "Single most important improvement suggestion"
-}`,
+  body: `IELTS examiner. Return ONLY JSON:
+{"topic_sentence":"clear|indirect|missing","reasoning":{"method":"deductive|inductive|cause_effect|example","strength":"strong|ok|weak"},"evidence":"concrete|vague|missing","errors":["max 2"],"comment":"1-2 sentences","improvement":"one suggestion"}`,
 
-  body: `You are an expert IELTS examiner. Analyze the body paragraph concisely.
+  counter: `IELTS examiner. Return ONLY JSON:
+{"acknowledgment":"fair|straw_man|dismissive","rebuttal":{"strategy":"alternative|evidence|scope_limit","strength":"strong|ok|weak"},"errors":["max 2"],"comment":"1-2 sentences","improvement":"one suggestion"}`,
 
-Return STRICT JSON only:
-{
-  "topic_sentence": {
-    "quality": "clear|indirect|missing",
-    "comment": "brief feedback"
-  },
-  "reasoning": {
-    "method": "deductive|inductive|cause_effect|example|unclear",
-    "strength": "strong|adequate|weak",
-    "comment": "brief feedback"
-  },
-  "evidence": {
-    "quality": "concrete|vague|missing",
-    "comment": "brief feedback"
-  },
-  "language": {
-    "level": "sophisticated|adequate|limited",
-    "errors": ["error1"]
-  },
-  "overall_comment": "2-3 sentences of key feedback",
-  "one_sentence_improvement": "Single most important improvement"
-}`,
+  points: `IELTS examiner. Analyze brainstormed points. Return ONLY JSON:
+{"points":[{"point":"text","strength":"strong|ok|weak","tip":"short"}],"missed":["max 2"],"best_3":["p1","p2","p3"],"comment":"1-2 sentences"}
+Max 5 points.`,
 
-  counter: `You are an expert IELTS examiner. Analyze the counter-argument paragraph concisely.
+  task1_report: `IELTS Task 1 examiner. Return ONLY JSON:
+{"addressed":true,"overview":true,"key_features":true,"structure":"good|ok|weak","errors":["max 3"],"words":0,"comment":"1-2 sentences","improvements":["max 2"]}`,
 
-Return STRICT JSON only:
-{
-  "acknowledgment": {
-    "fairness": "fair|straw_man|dismissive",
-    "comment": "brief feedback"
-  },
-  "rebuttal": {
-    "strategy": "alternative|causal_breakdown|scope_limit|evidence|none",
-    "effectiveness": "strong|adequate|weak",
-    "comment": "brief feedback"
-  },
-  "language": {
-    "level": "sophisticated|adequate|limited",
-    "errors": ["error1"]
-  },
-  "overall_comment": "2-3 sentences of key feedback",
-  "one_sentence_improvement": "Single most important improvement"
-}`,
-
-  points: `You are an expert IELTS examiner. Analyze brainstormed points concisely.
-
-Return STRICT JSON only:
-{
-  "points_analysis": [
-    {
-      "point": "the point",
-      "strength": "strong|moderate|weak",
-      "improvement": "brief suggestion"
-    }
-  ],
-  "missed_angles": ["angle1"],
-  "best_3_points": ["point1", "point2", "point3"],
-  "overall_comment": "2-3 sentences of key feedback"
-}
-
-Keep points_analysis to max 5 items.`,
-
-  task1_report: `You are an expert IELTS Writing Task 1 examiner. Do NOT provide a band score.
-Analyze the student's Task 1 report (describing data, charts, maps, or processes) and return STRICT JSON:
-{
-  "task_response": {
-    "prompt_addressed": true|false,
-    "position_clarity": "clear|unclear|missing",
-    "development_issues": ["string"],
-    "key_features_covered": true|false,
-    "overview_present": true|false
-  },
-  "coherence_cohesion": {
-    "paragraph_structure": "skillful|adequate|weak",
-    "cohesive_device_issues": ["string"],
-    "logic_flow": {
-      "coherent": true|false,
-      "breaks": ["string"]
-    }
-  },
-  "lexical_resource": {
-    "precision_issues": ["string"],
-    "collocation_errors": ["string"],
-    "data_language_accuracy": "accurate|mostly_accurate|inaccurate"
-  },
-  "grammar_accuracy": {
-    "errors": ["string"],
-    "range": "wide|adequate|limited"
-  },
-  "word_count": {
-    "total": 0,
-    "meets_minimum": true|false
-  },
-  "overall_comment": "2-3 sentences of constructive feedback"
-}
-
-Instructions:
-- Evaluate for IELTS Task 1 (150+ words minimum).
-- Check if key features and an overview are present.
-- Focus on accuracy of data description language.
-`,
-
-  template_fill: `You are an expert IELTS Writing Task 2 examiner. Provide concise, actionable feedback.
-
-Return STRICT JSON only (no markdown):
-{
-  "task_response": {
-    "prompt_addressed": true|false,
-    "position_clarity": "clear|vague|missing",
-    "development_issues": ["issue1", "issue2"]
-  },
-  "coherence_cohesion": {
-    "paragraph_structure": "skillful|adequate|weak",
-    "logic_flow": {
-      "coherent": true|false,
-      "breaks": ["issue1"]
-    }
-  },
-  "lexical_resource": {
-    "collocation_errors": ["error1"],
-    "improvement_suggestions": ["suggestion1"]
-  },
-  "grammar_accuracy": {
-    "errors": ["error with correction"],
-    "range": "wide|adequate|limited"
-  },
-  "word_count": {
-    "total": 0,
-    "meets_minimum": true|false
-  },
-  "overall_comment": "2-3 sentences of key feedback",
-  "top_3_improvements": ["improvement1", "improvement2", "improvement3"],
-  "estimated_band": "8-9|7-8|6-7|below6"
-}
-
-Instructions:
-- Count the actual words in the essay
-- Be specific but concise
-- Focus on the most important issues only
-- Keep arrays short (max 3 items each)
-`,
+  template_fill: `IELTS Task 2 examiner. Return ONLY this JSON (no extra text):
+{"task_response":{"addressed":true,"clarity":"clear|vague|missing","issues":["max 2"]},"coherence":{"structure":"good|ok|weak","issues":["max 2"]},"vocabulary":{"errors":["max 2"]},"grammar":{"errors":["max 2"],"range":"wide|ok|limited"},"words":0,"band":"8|7|6|5","comment":"1-2 sentences","improvements":["top 2 only"]}`,
 };
 
 export async function POST(request: Request) {
@@ -211,7 +63,7 @@ export async function POST(request: Request) {
         { role: "system", content: systemPrompt + "\n\nIMPORTANT: You must respond with valid JSON only, no markdown formatting, no code blocks, just pure JSON." },
         { role: "user", content: userMessage },
       ],
-      max_completion_tokens: 4000,
+      max_tokens: 2000,
     });
 
     const feedbackText = response.choices[0]?.message?.content;

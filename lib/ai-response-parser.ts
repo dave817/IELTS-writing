@@ -212,57 +212,75 @@ export function validateFeedbackStructure(
 
 /**
  * Create a default/fallback feedback object when parsing fails
+ * Uses simplified format matching the new compact prompts
  */
 export function createFallbackFeedback(rawText: string, drillType: string): Record<string, unknown> {
-  const baseMessage = "AI response could not be parsed. Here's the raw feedback:";
+  const comment = rawText.slice(0, 500);
   
   switch (drillType) {
     case "opening":
       return {
-        hook: { type: "unknown", effectiveness: "unknown", comment: baseMessage },
-        transition: { clarity: "unknown", comment: rawText },
-        stance: { clarity: "unknown", points_previewed: 0, comment: "" },
-        language: { sophistication: "unknown", errors: [] },
-        overall_comment: rawText.slice(0, 500),
-        improved_version: "",
+        hook: { type: "unknown", quality: "unknown" },
+        thesis: { clarity: "unknown", answers_prompt: false },
+        errors: [],
+        comment,
+        improvement: "See raw feedback above",
       };
     
     case "body":
+      return {
+        topic_sentence: "unknown",
+        reasoning: { method: "unknown", strength: "unknown" },
+        evidence: "unknown",
+        errors: [],
+        comment,
+        improvement: "See raw feedback above",
+      };
+    
     case "counter":
       return {
-        overall_comment: rawText.slice(0, 500),
-        improved_version: "",
+        acknowledgment: "unknown",
+        rebuttal: { strategy: "unknown", strength: "unknown" },
+        errors: [],
+        comment,
+        improvement: "See raw feedback above",
+      };
+    
+    case "points":
+      return {
+        points: [],
+        missed: [],
+        best_3: [],
+        comment,
       };
     
     case "template_fill":
+      return {
+        task_response: { addressed: false, clarity: "unknown", issues: [] },
+        coherence: { structure: "unknown", issues: [] },
+        vocabulary: { errors: [] },
+        grammar: { errors: [], range: "unknown" },
+        words: 0,
+        band: "?",
+        comment,
+        improvements: [],
+      };
+    
     case "task1_report":
       return {
-        task_response: {
-          prompt_addressed: false,
-          position_clarity: "unknown",
-          development_issues: [baseMessage],
-          relevance_flags: [],
-        },
-        coherence_cohesion: {
-          paragraph_structure: "unknown",
-          cohesive_device_issues: [],
-          logic_flow: { coherent: false, breaks: [] },
-        },
-        lexical_resource: {
-          precision_issues: [],
-          collocation_errors: [],
-        },
-        grammar_accuracy: {
-          errors: [],
-          range: "unknown",
-        },
-        word_count: { total: 0, meets_minimum: false },
-        overall_comment: rawText.slice(0, 500),
+        addressed: false,
+        overview: false,
+        key_features: false,
+        structure: "unknown",
+        errors: [],
+        words: 0,
+        comment,
+        improvements: [],
       };
     
     default:
       return {
-        overall_comment: rawText.slice(0, 500),
+        comment,
         error: "Unable to parse structured feedback",
       };
   }
