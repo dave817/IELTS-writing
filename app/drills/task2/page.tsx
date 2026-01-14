@@ -226,7 +226,7 @@ interface SavedSession {
   timer: number;
   questionId?: string;
   questionText?: string;
-  savedAt: number;
+  savedAt?: number;
 }
 
 export default function Task2Drill() {
@@ -245,7 +245,7 @@ export default function Task2Drill() {
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
   // Auto-save hook
-  const { save, load, clear } = useAutoSave({ key: "task2-drill" });
+  const { save, load, clear } = useAutoSave<SavedSession>({ key: "task2-drill" });
   
   // Prevent double-submit
   const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
@@ -257,7 +257,7 @@ export default function Task2Drill() {
   useEffect(() => {
     const saved = load();
     if (saved && saved.text && saved.text.trim().length > 0) {
-      setSavedSession(saved as SavedSession);
+      setSavedSession(saved);
       setShowRestoreDialog(true);
     }
   }, [load]);
@@ -701,7 +701,7 @@ In conclusion, while both sides present valid arguments..."
               <RotateCcw className="h-5 w-5" /> 發現未完成的作文
             </DialogTitle>
             <DialogDescription>
-              你有一篇 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的作文，
+              你有一篇 {savedSession?.savedAt ? formatTimeSince(savedSession.savedAt) : ""} 保存的作文，
               共 {savedSession?.text?.trim().split(/\s+/).filter(w => w.length > 0).length || 0} 字，
               剩餘時間 {savedSession ? Math.floor(savedSession.timer / 60) : 0} 分鐘。
             </DialogDescription>

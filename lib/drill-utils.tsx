@@ -14,10 +14,12 @@ export function formatTime(seconds: number): string {
 
 /**
  * Get timer color class based on remaining time
+ * @param seconds - remaining seconds
+ * @param redThreshold - seconds below which to show red (default: 60)
  */
-export function getTimerColorClass(seconds: number): string {
-  if (seconds < 300) return "text-red-500"; // < 5 min
-  if (seconds < 600) return "text-yellow-500"; // < 10 min
+export function getTimerColorClass(seconds: number, redThreshold: number = 60): string {
+  if (seconds < redThreshold) return "text-red-500";
+  if (seconds < redThreshold * 5) return "text-yellow-500";
   return "text-primary";
 }
 

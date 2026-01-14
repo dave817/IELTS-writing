@@ -49,7 +49,7 @@ interface SavedSession {
   timer: number;
   questionId?: string;
   questionText?: string;
-  savedAt: number;
+  savedAt?: number;
 }
 
 export default function CounterDrill() {
@@ -65,7 +65,7 @@ export default function CounterDrill() {
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
   // Auto-save hook
-  const { save, load, clear } = useAutoSave({ key: "counter-drill" });
+  const { save, load, clear } = useAutoSave<SavedSession>({ key: "counter-drill" });
   
   // Prevent double-submit
   const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
@@ -76,7 +76,7 @@ export default function CounterDrill() {
   useEffect(() => {
     const saved = load();
     if (saved && saved.text && saved.text.trim().length > 0) {
-      setSavedSession(saved as SavedSession);
+      setSavedSession(saved);
       setShowRestoreDialog(true);
     } else {
       fetchRandomQuestion();
@@ -273,7 +273,7 @@ export default function CounterDrill() {
               <RotateCcw className="h-5 w-5" /> 發現未完成的練習
             </DialogTitle>
             <DialogDescription>
-              你有一篇 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的段落。
+              你有一篇 {savedSession?.savedAt ? formatTimeSince(savedSession.savedAt) : ""} 保存的段落。
             </DialogDescription>
           </DialogHeader>
           <div className="p-3 bg-muted rounded-lg text-sm max-h-24 overflow-hidden">

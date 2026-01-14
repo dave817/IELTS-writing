@@ -233,7 +233,7 @@ interface SavedSession {
   timer: number;
   questionId?: string;
   questionText?: string;
-  savedAt: number;
+  savedAt?: number;
 }
 
 const DRILL_TIME = 20 * 60; // 20 minutes
@@ -252,7 +252,7 @@ export default function Task1Drill() {
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
   // Auto-save hook
-  const { save, load, clear } = useAutoSave({ key: "task1-drill" });
+  const { save, load, clear } = useAutoSave<SavedSession>({ key: "task1-drill" });
   
   // Prevent double-submit
   const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
@@ -263,7 +263,7 @@ export default function Task1Drill() {
   useEffect(() => {
     const saved = load();
     if (saved && saved.text && saved.text.trim().length > 0) {
-      setSavedSession(saved as SavedSession);
+      setSavedSession(saved);
       setShowRestoreDialog(true);
     }
   }, [load]);
@@ -618,7 +618,7 @@ Looking at the details..."
               <RotateCcw className="h-5 w-5" /> 發現未完成的練習
             </DialogTitle>
             <DialogDescription>
-              你有一篇 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的報告。
+              你有一篇 {savedSession?.savedAt ? formatTimeSince(savedSession.savedAt) : ""} 保存的報告。
             </DialogDescription>
           </DialogHeader>
           <div className="p-3 bg-muted rounded-lg text-sm max-h-24 overflow-hidden">

@@ -367,7 +367,7 @@ export default function PointGenerationDrill() {
               <RotateCcw className="h-5 w-5" /> 發現未完成的練習
             </DialogTitle>
             <DialogDescription>
-              你有一個 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的 Point Generation 練習。
+              你有一個 {savedSession?.savedAt ? formatTimeSince(savedSession.savedAt) : ""} 保存的 Point Generation 練習。
             </DialogDescription>
           </DialogHeader>
           <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
