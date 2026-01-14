@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { openai, deployment } from "@/lib/openai";
+import { getOpenAIClient, getDeploymentName } from "@/lib/openai";
 
 export async function GET() {
   try {
+    const openai = getOpenAIClient();
+    const deployment = getDeploymentName();
+    
     const response = await openai.chat.completions.create({
       model: deployment,
       messages: [
@@ -29,4 +32,3 @@ export async function GET() {
     );
   }
 }
-

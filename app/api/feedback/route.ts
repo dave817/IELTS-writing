@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { openai, deployment } from "@/lib/openai";
+import { getOpenAIClient, getDeploymentName } from "@/lib/openai";
 import { parseAIResponse, createFallbackFeedback } from "@/lib/ai-response-parser";
 
 const SYSTEM_PROMPTS: Record<string, string> = {
@@ -394,6 +394,9 @@ export async function POST(request: Request) {
           `\n\nStudent's Response:\n${userResponse}`,
         ].join("");
 
+    const openai = getOpenAIClient();
+    const deployment = getDeploymentName();
+    
     const response = await openai.chat.completions.create({
       model: deployment,
       messages: [
