@@ -5,7 +5,7 @@ import { AzureOpenAI } from "openai";
 const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
 const apiKey = process.env.AZURE_OPENAI_API_KEY;
 const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME || process.env.AZURE_OPENAI_DEPLOYMENT;
-const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview";
+const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2025-04-01-preview";
 
 // Lazy initialization to avoid build-time errors
 let _openai: AzureOpenAI | null = null;
