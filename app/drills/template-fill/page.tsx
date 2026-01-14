@@ -201,19 +201,23 @@ export default function TemplateFillDrill() {
         }
         const data = await res.json();
         
-        // Store feedback in sessionStorage and navigate to feedback page
-        sessionStorage.setItem("ielts-feedback", JSON.stringify(data.feedback));
+        console.log("API Response:", data); // Debug log
+        
+        // Store feedback in sessionStorage
+        const feedbackData = data.feedback || data;
+        sessionStorage.setItem("ielts-feedback", JSON.stringify(feedbackData));
         sessionStorage.setItem("ielts-word-count", String(wordCount));
         
         setIsRunning(false);
         clear();
+        setSubmitting(false);
         
-        // Navigate to feedback page
-        router.push("/drills/feedback");
+        // Navigate using window.location for more reliable navigation
+        window.location.href = "/drills/feedback";
       } catch (err) {
+        console.error("Feedback error:", err); // Debug log
         const message = err instanceof Error ? err.message : "Failed to get AI feedback";
         toast.error(message);
-      } finally {
         setSubmitting(false);
       }
     });
