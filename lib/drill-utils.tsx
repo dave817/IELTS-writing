@@ -35,46 +35,33 @@ export function countWords(text: string): number {
 /**
  * Get feedback icon based on quality indicator
  */
-export function getQualityIcon(quality: boolean | string): ReactNode {
-  // Positive indicators
-  const positiveValues = [
-    true,
-    "clear",
-    "unmistakable",
-    "skillful",
-    "wide",
-    "excellent",
-    "strong",
-    "irrefutable",
-    "band9",
-    "effortless",
-    "smooth",
-    "natural",
-    "precise",
-  ];
+export function getQualityIcon(quality: boolean | string | undefined | null): ReactNode {
+  // Handle undefined/null
+  if (quality === undefined || quality === null) {
+    return null;
+  }
   
-  // Neutral/adequate indicators  
-  const neutralValues = [
-    "adequate",
-    "vague",
-    "unclear",
-    "moderate",
-    "mostly_formal",
-    "some",
-    "band7",
-    "band8",
-  ];
-  
-  // Check type
+  // Check boolean
   if (typeof quality === "boolean") {
     return quality 
       ? <CheckCircle className="h-4 w-4 text-green-500" />
       : <XCircle className="h-4 w-4 text-red-500" />;
   }
   
+  // Handle string
+  if (typeof quality !== "string") {
+    return null;
+  }
+  
   const lowerQuality = quality.toLowerCase();
   
-  if (positiveValues.some(v => typeof v === "string" && lowerQuality.includes(v))) {
+  // Positive indicators
+  const positiveValues = ["clear", "unmistakable", "skillful", "wide", "excellent", "strong", "irrefutable", "band9", "effortless", "smooth", "natural", "precise", "good"];
+  
+  // Neutral indicators  
+  const neutralValues = ["adequate", "vague", "unclear", "moderate", "mostly_formal", "some", "band7", "band8", "occasional"];
+  
+  if (positiveValues.some(v => lowerQuality.includes(v))) {
     return <CheckCircle className="h-4 w-4 text-green-500" />;
   }
   
