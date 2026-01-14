@@ -236,80 +236,53 @@ Instructions:
 - Check prioritization of information (詳略得當)
 `,
 
-  template_fill: `You are an expert IELTS Writing Task 2 examiner (Band 8-9 standard).
+  template_fill: `You are an expert IELTS Writing Task 2 examiner.
 
-GRADING CRITERIA:
-- Band 8: Very good logic (极低可抬杠性), plausible evidence, highly accurate language
-- Band 9: Optimized arguments, format variety, layered reasoning, 论点清晰不重不漏
+IMPORTANT: You MUST provide detailed comments for EACH of the 4 criteria. Do not leave any comment field empty.
 
-Return STRICT JSON:
+Return this EXACT JSON structure:
 {
+  "word_count": {"total": 0, "meets_minimum": true},
+  "estimated_band": "8-9 or 7-8 or 6-7 or below6",
+  
   "task_response": {
-    "all_questions_answered": true|false,
-    "position_clarity": "unmistakable|clear|vague|missing",
-    "stance_strength": "definitive|moderate|weak",
-    "argument_methods_used": ["deductive|inductive|cause_effect|exemplification|compare_contrast|counter_argument"],
-    "logic_strength": "band9_irrefutable|band8_minimal_counter|band7_gaps|weak",
-    "development_analysis": "Detailed paragraph-by-paragraph analysis of argument development",
-    "issues": ["specific issue 1", "specific issue 2"],
-    "comment": "2-3 sentences on task response quality"
+    "score_indicator": "good or adequate or weak",
+    "position_clarity": "clear or vague or missing",
+    "all_questions_answered": true,
+    "issues": ["list specific issues found"],
+    "comment": "REQUIRED: Write 3-4 sentences analyzing how well the essay addresses the prompt, the clarity of position, and argument development quality."
   },
+  
   "coherence_cohesion": {
-    "overall_flow": "effortless|smooth|adequate|choppy",
-    "paragraph_structure": "skillful|adequate|weak",
-    "paragraph_analysis": "Analysis of each paragraph's role and transitions",
-    "cohesive_devices": {
-      "usage": "natural|adequate|overused|underused",
-      "examples": ["good examples used"],
-      "issues": ["problematic usages"]
-    },
-    "logic_flow_breaks": ["specific gap or break in logic"],
-    "comment": "2-3 sentences on coherence quality"
+    "score_indicator": "good or adequate or weak", 
+    "paragraph_structure": "skillful or adequate or weak",
+    "flow": "smooth or adequate or choppy",
+    "issues": ["list specific cohesion issues"],
+    "comment": "REQUIRED: Write 3-4 sentences analyzing paragraph organization, use of cohesive devices, and logical flow."
   },
+  
   "lexical_resource": {
-    "range": "wide_sophisticated|adequate|limited",
-    "precision": "precise|mostly_accurate|imprecise",
-    "vocabulary_highlights": ["excellent word/phrase 1", "excellent word/phrase 2"],
-    "formality_issues": ["any contractions like don't/can't", "abbreviations", "informal words"],
-    "over_exaggeration": ["overly dramatic or imprecise claims"],
-    "collocation_errors": [{"error": "wrong collocation", "correction": "correct form"}],
-    "word_choice_improvements": [{"original": "word used", "better": "suggested improvement", "reason": "why"}],
-    "comment": "2-3 sentences on vocabulary quality and sophistication"
+    "score_indicator": "good or adequate or weak",
+    "range": "wide or adequate or limited",
+    "good_vocabulary": ["list 2-3 good words/phrases used"],
+    "errors": ["list vocabulary errors with corrections"],
+    "comment": "REQUIRED: Write 3-4 sentences analyzing vocabulary range, precision, and appropriateness for academic writing."
   },
+  
   "grammar_accuracy": {
-    "range": "wide_flexible|adequate|limited",
-    "sentence_variety": "excellent|good|limited",
-    "error_frequency": "extremely_rare|occasional|frequent",
-    "errors": [{"error": "the grammatical error", "correction": "corrected version", "type": "tense|agreement|article|etc"}],
-    "punctuation_issues": [{"issue": "punctuation problem", "correction": "how to fix"}],
-    "highlights": ["well-constructed sentences"],
-    "comment": "2-3 sentences on grammar quality"
+    "score_indicator": "good or adequate or weak",
+    "range": "wide or adequate or limited",
+    "good_sentences": ["quote 1-2 well-constructed sentences"],
+    "errors": ["list grammar errors with corrections"],
+    "comment": "REQUIRED: Write 3-4 sentences analyzing grammatical range, accuracy, and sentence variety."
   },
-  "word_count": {
-    "total": 0,
-    "meets_minimum": true|false
-  },
-  "conclusion_quality": {
-    "summarizes_differently": true|false,
-    "broadens_perspective": true|false,
-    "avoids_new_info": true|false,
-    "is_concise": true|false,
-    "comment": "feedback on conclusion"
-  },
-  "estimated_band": "8.5-9|8-8.5|7.5-8|7-7.5|below7",
+  
   "overall_strengths": ["strength 1", "strength 2"],
-  "priority_improvements": ["most important fix 1", "most important fix 2", "most important fix 3"],
-  "overall_comment": "3-4 sentences of comprehensive feedback"
+  "priority_improvements": ["improvement 1", "improvement 2", "improvement 3"],
+  "overall_comment": "4-5 sentences of comprehensive feedback summarizing the essay quality."
 }
 
-Instructions:
-- Be thorough and specific with examples from the essay
-- Quote actual phrases when pointing out errors or highlights
-- Focus on logic strength and argument irrefutability (可抬杠性)
-- Check formal register: no contractions (don't, can't), no abbreviations
-- Evaluate reasoning depth using multiple methods
-- Count actual words accurately
-`,
+CRITICAL: Every "comment" field MUST contain 3-4 detailed sentences. Do not skip any comment field.`,
 };
 
 export async function POST(request: Request) {
