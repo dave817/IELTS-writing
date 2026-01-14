@@ -273,9 +273,11 @@ const MNEMONICS = {
 };
 
 // ==================== QUESTION STRUCTURES ====================
+// These map to the questionType values in the database (seed.js)
 const QUESTION_STRUCTURES = {
-  TypeA: {
-    name: "Type A: Discuss Both Views",
+  Discussion: {
+    name: "Discussion (Discuss Both Views)",
+    dbType: "Discussion", // matches seed.js
     percentage: "19.2%",
     structure: [
       { part: "Introduction", content: "Paraphrase + mention both views + your stance" },
@@ -285,8 +287,9 @@ const QUESTION_STRUCTURES = {
       { part: "Conclusion", content: "Summarize + restate position" },
     ],
   },
-  TypeB: {
-    name: "Type B: To What Extent / Opinion",
+  Opinion: {
+    name: "Opinion (To What Extent)",
+    dbType: "Opinion", // matches seed.js
     percentage: "35.4%",
     structure: [
       { part: "Introduction", content: "Paraphrase + clear stance" },
@@ -296,8 +299,9 @@ const QUESTION_STRUCTURES = {
       { part: "Conclusion", content: "Summarize + strengthen position" },
     ],
   },
-  TypeC: {
-    name: "Type C: Advantages & Disadvantages",
+  AdvantageDisadvantage: {
+    name: "Advantage/Disadvantage",
+    dbType: "Advantage/Disadvantage", // matches seed.js
     percentage: "16.8%",
     structure: [
       { part: "Introduction", content: "Paraphrase topic + indicate discussion" },
@@ -306,8 +310,9 @@ const QUESTION_STRUCTURES = {
       { part: "Conclusion", content: "Overall assessment / balanced view" },
     ],
   },
-  TypeD: {
-    name: "Type D: Problems/Causes/Solutions",
+  Solution: {
+    name: "Solution (Problems/Causes)",
+    dbType: "Solution", // matches seed.js
     percentage: "17.9%",
     structure: [
       { part: "Introduction", content: "Acknowledge the issue" },
@@ -316,8 +321,9 @@ const QUESTION_STRUCTURES = {
       { part: "Conclusion", content: "Summarize + call to action" },
     ],
   },
-  TypeE: {
-    name: "Type E: Direct Questions",
+  DirectQuestions: {
+    name: "Direct Questions",
+    dbType: "Direct Questions", // matches seed.js
     percentage: "10.7%",
     structure: [
       { part: "Introduction", content: "Address the topic briefly" },

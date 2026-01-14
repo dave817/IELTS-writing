@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,9 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCw, Send, Info, Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import { RefreshCw, Send, Info, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useAutoSave, formatTimeSince } from "@/lib/hooks/use-auto-save";
+import { formatTime, getTimerColorClass, countWords, getQualityIcon } from "@/lib/drill-utils";
+import { useDebounceSubmit } from "@/lib/hooks/use-api-request";
 
 interface Question {
   id: string;
@@ -51,6 +54,14 @@ interface BodyFeedback {
   improved_version: string;
 }
 
+interface SavedSession {
+  text: string;
+  timer: number;
+  questionId?: string;
+  questionText?: string;
+  savedAt: number;
+}
+
 export default function BodyDrill() {
   const [question, setQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(false);
@@ -61,10 +72,65 @@ export default function BodyDrill() {
   const [paraType, setParaType] = useState("mp1");
   const [feedback, setFeedback] = useState<BodyFeedback | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
+  // Auto-save hook
+  const { save, load, clear } = useAutoSave({ key: "body-drill" });
+  
+  // Prevent double-submit
+  const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
+
+  const wordCount = countWords(text);
+
+  // Check for saved session on mount
   useEffect(() => {
+    const saved = load();
+    if (saved && saved.text && saved.text.trim().length > 0) {
+      setSavedSession(saved as SavedSession);
+      setShowRestoreDialog(true);
+    } else {
+      fetchRandomQuestion();
+    }
+  }, [load]);
+
+  // Auto-save when text changes
+  useEffect(() => {
+    if (question && text.trim().length > 0) {
+      save({
+        text,
+        timer,
+        questionId: question.id,
+        questionText: question.questionText,
+      });
+    }
+  }, [text, timer, question, save]);
+
+  // Restore previous session
+  const restoreSession = useCallback(() => {
+    if (savedSession) {
+      setText(savedSession.text);
+      setTimer(savedSession.timer);
+      if (savedSession.questionText) {
+        setQuestion({
+          id: savedSession.questionId || "restored",
+          questionText: savedSession.questionText,
+          questionType: "Restored",
+        });
+      }
+      setIsRunning(true);
+      setShowRestoreDialog(false);
+      toast.success("Session restored!");
+    }
+  }, [savedSession]);
+
+  // Start fresh
+  const startFresh = useCallback(() => {
+    clear();
+    setSavedSession(null);
+    setShowRestoreDialog(false);
     fetchRandomQuestion();
-  }, []);
+  }, [clear]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -90,6 +156,7 @@ export default function BodyDrill() {
       setIsRunning(true);
       setText("");
       setFeedback(null);
+      clear();
     } catch {
       toast.error("Failed to load question");
     } finally {
@@ -102,43 +169,35 @@ export default function BodyDrill() {
       toast.error("Please write something first");
       return;
     }
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          drillType: "body",
-          prompt: question?.questionText,
-          userResponse: text,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to get feedback");
-      const data = await res.json();
-      setFeedback(data.feedback);
-      setShowFeedback(true);
-      setIsRunning(false);
-    } catch {
-      toast.error("Failed to get AI feedback");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getIcon = (good: boolean | string) => {
-    if (good === true || good === "direct" || good === "clear" || good === "sound" || good === "fully_developed" || good === "concrete" || good === "supports_point") {
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
-    }
-    if (good === "adequate" || good === "indirect" || good === "weak" || good === "vague" || good === "tangential") {
-      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    }
-    return <XCircle className="h-4 w-4 text-red-500" />;
+    
+    await withDebounce(async () => {
+      setSubmitting(true);
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            drillType: "body",
+            prompt: question?.questionText,
+            userResponse: text,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to get feedback");
+        }
+        const data = await res.json();
+        setFeedback(data.feedback);
+        setShowFeedback(true);
+        setIsRunning(false);
+        clear();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to get AI feedback";
+        toast.error(message);
+      } finally {
+        setSubmitting(false);
+      }
+    });
   };
 
   return (
@@ -154,7 +213,7 @@ export default function BodyDrill() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className={`text-3xl font-mono font-bold ${timer < 60 ? "text-red-500" : "text-primary"}`}>
+          <div className={`text-3xl font-mono font-bold ${getTimerColorClass(timer)}`}>
             {formatTime(timer)}
           </div>
           <Button variant="outline" size="icon" onClick={fetchRandomQuestion} disabled={loading}>
@@ -212,9 +271,9 @@ export default function BodyDrill() {
             />
             <div className="flex justify-between items-center mt-4">
               <span className="text-sm text-muted-foreground">
-                Words: {text.trim().split(/\s+/).filter(w => w.length > 0).length} / ~90-100 target
+                Words: {wordCount} / ~90-100 target
               </span>
-              <Button onClick={submitForFeedback} disabled={submitting || !text.trim()}>
+              <Button onClick={submitForFeedback} disabled={submitting || isDebouncing || !text.trim()}>
                 {submitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...
@@ -230,11 +289,39 @@ export default function BodyDrill() {
         </Card>
       </div>
 
+      {/* Restore Session Dialog */}
+      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <RotateCcw className="h-5 w-5" /> 發現未完成的練習
+            </DialogTitle>
+            <DialogDescription>
+              你有一篇 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的段落。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-muted rounded-lg text-sm max-h-24 overflow-hidden">
+            <p className="line-clamp-3 text-muted-foreground">
+              {savedSession?.text?.slice(0, 200)}...
+            </p>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" onClick={startFresh} className="flex-1">
+              重新開始
+            </Button>
+            <Button onClick={restoreSession} className="flex-1">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              恢復練習
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
         <DialogContent className="max-w-3xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>AI Feedback - Body Paragraph</DialogTitle>
-            <DialogDescription>Analysis by GPT-5.1</DialogDescription>
+            <DialogDescription>Analysis by AI</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-4">
             {feedback && (
@@ -242,7 +329,7 @@ export default function BodyDrill() {
                 {/* Topic Sentence */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.topic_sentence.directness)}
+                    {getQualityIcon(feedback.topic_sentence.directness)}
                     Topic Sentence ({feedback.topic_sentence.directness})
                   </h3>
                   <p className="text-sm text-muted-foreground">{feedback.topic_sentence.comment}</p>
@@ -251,7 +338,7 @@ export default function BodyDrill() {
                 {/* Explanation */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.explanation.logic)}
+                    {getQualityIcon(feedback.explanation.logic)}
                     Explanation ({feedback.explanation.depth})
                   </h3>
                   <p className="text-sm text-muted-foreground">{feedback.explanation.comment}</p>
@@ -260,7 +347,7 @@ export default function BodyDrill() {
                 {/* Example */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.example.specificity)}
+                    {getQualityIcon(feedback.example.specificity)}
                     Example ({feedback.example.specificity})
                   </h3>
                   <p className="text-sm text-muted-foreground">{feedback.example.comment}</p>
@@ -269,7 +356,7 @@ export default function BodyDrill() {
                 {/* Small Conclusion */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.small_conclusion.present)}
+                    {getQualityIcon(feedback.small_conclusion.present)}
                     Small Conclusion
                   </h3>
                   <p className="text-sm text-muted-foreground">

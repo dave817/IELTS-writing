@@ -11,9 +11,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { RefreshCw, Send, FileText, Loader2, CheckCircle, XCircle, AlertTriangle, Clock, AlertCircle, Lock } from "lucide-react";
+import { RefreshCw, Send, FileText, Loader2, Clock, AlertCircle, AlertTriangle, Lock, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useAutoSave, formatTimeSince } from "@/lib/hooks/use-auto-save";
+import { formatTime, getTimerColorClass, countWords, getQualityIcon } from "@/lib/drill-utils";
+import { useDebounceSubmit } from "@/lib/hooks/use-api-request";
 
 interface Question {
   id: string;
@@ -66,6 +69,14 @@ interface FullFeedback {
   overall_comment: string;
 }
 
+interface SavedSession {
+  text: string;
+  timer: number;
+  questionId?: string;
+  questionText?: string;
+  savedAt: number;
+}
+
 const MIN_WORDS = 500;
 const DRILL_TIME = 40 * 60; // 40 minutes in seconds
 
@@ -81,13 +92,67 @@ export default function TemplateFillDrill() {
   const [feedback, setFeedback] = useState<FullFeedback | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [showLowWordWarning, setShowLowWordWarning] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
-  const wordCount = text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  // Auto-save hook
+  const { save, load, clear } = useAutoSave({ key: "template-fill-drill" });
+  
+  // Prevent double-submit
+  const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
+
+  const wordCount = countWords(text);
 
   // Fetch locked templates
   useEffect(() => {
     fetchLockedTemplates();
   }, []);
+
+  // Check for saved session on mount
+  useEffect(() => {
+    const saved = load();
+    if (saved && saved.text && saved.text.trim().length > 0) {
+      setSavedSession(saved as SavedSession);
+      setShowRestoreDialog(true);
+    }
+  }, [load]);
+
+  // Auto-save when text changes
+  useEffect(() => {
+    if (question && text.trim().length > 0) {
+      save({
+        text,
+        timer,
+        questionId: question.id,
+        questionText: question.questionText,
+      });
+    }
+  }, [text, timer, question, save]);
+
+  // Restore previous session
+  const restoreSession = useCallback(() => {
+    if (savedSession) {
+      setText(savedSession.text);
+      setTimer(savedSession.timer);
+      if (savedSession.questionText) {
+        setQuestion({
+          id: savedSession.questionId || "restored",
+          questionText: savedSession.questionText,
+          questionType: "Restored",
+        });
+      }
+      setIsRunning(true);
+      setShowRestoreDialog(false);
+      toast.success("Session restored!");
+    }
+  }, [savedSession]);
+
+  // Start fresh
+  const startFresh = useCallback(() => {
+    clear();
+    setSavedSession(null);
+    setShowRestoreDialog(false);
+  }, [clear]);
 
   const fetchLockedTemplates = async () => {
     try {
@@ -133,6 +198,7 @@ export default function TemplateFillDrill() {
       toast.error("Please select a template first");
       return;
     }
+    clear();
     fetchRandomQuestion();
     setTimer(DRILL_TIME);
     setIsRunning(true);
@@ -153,48 +219,40 @@ export default function TemplateFillDrill() {
       toast.error("Please write something first");
       return;
     }
-    setShowLowWordWarning(false);
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          drillType: "template_fill",
-          prompt: question?.questionText,
-          userResponse: text,
-          userTemplate: selectedTemplate?.templateText,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to get feedback");
-      const data = await res.json();
-      setFeedback(data.feedback);
-      setShowFeedback(true);
-      setIsRunning(false);
-    } catch {
-      toast.error("Failed to get AI feedback");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+    
+    await withDebounce(async () => {
+      setShowLowWordWarning(false);
+      setSubmitting(true);
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            drillType: "template_fill",
+            prompt: question?.questionText,
+            userResponse: text,
+            userTemplate: selectedTemplate?.templateText,
+          }),
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to get feedback");
+        }
+        const data = await res.json();
+        setFeedback(data.feedback);
+        setShowFeedback(true);
+        setIsRunning(false);
+        clear();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to get AI feedback";
+        toast.error(message);
+      } finally {
+        setSubmitting(false);
+      }
+    });
   };
 
   const timerProgress = ((DRILL_TIME - timer) / DRILL_TIME) * 100;
-
-  const getIcon = (good: boolean | string) => {
-    if (good === true || good === "clear" || good === "skillful" || good === "wide") {
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
-    }
-    if (good === "adequate" || good === "unclear") {
-      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    }
-    return <XCircle className="h-4 w-4 text-red-500" />;
-  };
 
   return (
     <div className="container mx-auto py-6">
@@ -209,7 +267,7 @@ export default function TemplateFillDrill() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className={`text-3xl font-mono font-bold ${timer < 300 ? "text-red-500" : "text-primary"}`}>
+          <div className={`text-3xl font-mono font-bold ${getTimerColorClass(timer)}`}>
             <Clock className="inline h-6 w-6 mr-2" />
             {formatTime(timer)}
           </div>
@@ -352,7 +410,7 @@ export default function TemplateFillDrill() {
                         </Badge>
                       )}
                     </div>
-                    <Button onClick={handleSubmit} disabled={submitting || !text.trim()}>
+                    <Button onClick={handleSubmit} disabled={submitting || isDebouncing || !text.trim()}>
                       {submitting ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...
@@ -370,6 +428,35 @@ export default function TemplateFillDrill() {
           </div>
         </div>
       )}
+
+      {/* Restore Session Dialog */}
+      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <RotateCcw className="h-5 w-5" /> 發現未完成的作文
+            </DialogTitle>
+            <DialogDescription>
+              你有一篇 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的作文，
+              共 {savedSession?.text?.trim().split(/\s+/).filter(w => w.length > 0).length || 0} 字。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-muted rounded-lg text-sm max-h-32 overflow-hidden">
+            <p className="line-clamp-4 text-muted-foreground">
+              {savedSession?.text?.slice(0, 300)}...
+            </p>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" onClick={startFresh} className="flex-1">
+              重新開始
+            </Button>
+            <Button onClick={restoreSession} className="flex-1">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              恢復作文
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Low Word Count Warning Dialog */}
       <Dialog open={showLowWordWarning} onOpenChange={setShowLowWordWarning}>
@@ -405,7 +492,7 @@ export default function TemplateFillDrill() {
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>AI Feedback - Full Essay Analysis</DialogTitle>
-            <DialogDescription>Comprehensive analysis by GPT-5.1</DialogDescription>
+            <DialogDescription>Comprehensive analysis by AI</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-4">
             {feedback && (
@@ -424,7 +511,7 @@ export default function TemplateFillDrill() {
                 {/* Task Response */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.task_response?.prompt_addressed)}
+                    {getQualityIcon(feedback.task_response?.prompt_addressed)}
                     Task Response
                   </h3>
                   <p className="text-sm">Position Clarity: {feedback.task_response?.position_clarity}</p>
@@ -440,7 +527,7 @@ export default function TemplateFillDrill() {
                 {/* Coherence & Cohesion */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.coherence_cohesion?.paragraph_structure)}
+                    {getQualityIcon(feedback.coherence_cohesion?.paragraph_structure)}
                     Coherence & Cohesion ({feedback.coherence_cohesion?.paragraph_structure})
                   </h3>
                   {feedback.coherence_cohesion?.logic_flow?.breaks?.length > 0 && (
@@ -487,7 +574,7 @@ export default function TemplateFillDrill() {
                 {/* Grammar */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.grammar_accuracy?.range)}
+                    {getQualityIcon(feedback.grammar_accuracy?.range)}
                     Grammar Accuracy ({feedback.grammar_accuracy?.range} range)
                   </h3>
                   {feedback.grammar_accuracy?.errors?.length > 0 && (
@@ -545,4 +632,3 @@ export default function TemplateFillDrill() {
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { RefreshCw, CheckCircle, Search } from "lucide-react";
+import { RefreshCw, CheckCircle, Search, RotateCcw } from "lucide-react";
+import { useAutoSave, formatTimeSince } from "@/lib/hooks/use-auto-save";
+import { formatTime, getTimerColorClass } from "@/lib/drill-utils";
 
 interface Question {
   id: string;
@@ -17,6 +20,14 @@ interface Question {
   questionType: string;
   taskType: string;
   source?: string | null;
+}
+
+interface SavedSession {
+  points: string[];
+  timer: number;
+  questionId?: string;
+  questionText?: string;
+  savedAt: number;
 }
 
 const MNEMONICS = [
@@ -78,18 +89,76 @@ const TOPIC_BANK = [
   { category: "Employment", points: ["Job satisfaction", "Work-life balance", "Career progression"] },
 ];
 
+const DRILL_TIME = 180; // 3 minutes
+
 export default function PointGenerationDrill() {
   const [question, setQuestion] = useState<Question | null>(null);
   const [loading, setLoading] = useState(false);
-  const [timer, setTimer] = useState(180); // 3 minutes
+  const [timer, setTimer] = useState(DRILL_TIME);
   const [isRunning, setIsRunning] = useState(false);
   const [points, setPoints] = useState(["", "", ""]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
+  // Auto-save hook
+  const { save, load, clear } = useAutoSave({ key: "point-generation-drill" });
+
+  // Check for saved session on mount
   useEffect(() => {
-    fetchRandomQuestion();
+    const saved = load();
+    if (saved) {
+      const sessionData = saved as SavedSession;
+      if (sessionData.points && sessionData.points.some((p: string) => p.trim() !== "")) {
+        setSavedSession(sessionData);
+        setShowRestoreDialog(true);
+      } else {
+        fetchRandomQuestion();
+      }
+    } else {
+      fetchRandomQuestion();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-save when points change
+  useEffect(() => {
+    if (question && points.some(p => p.trim() !== "")) {
+      save({
+        points,
+        timer,
+        questionId: question.id,
+        questionText: question.questionText,
+      } as unknown as { text: string; timer: number });
+    }
+  }, [points, timer, question, save]);
+
+  // Restore previous session
+  const restoreSession = useCallback(() => {
+    if (savedSession) {
+      setPoints(savedSession.points || ["", "", ""]);
+      setTimer(savedSession.timer);
+      if (savedSession.questionText) {
+        setQuestion({
+          id: savedSession.questionId || "restored",
+          questionText: savedSession.questionText,
+          questionType: "Restored",
+          taskType: "Task 2",
+        });
+      }
+      setIsRunning(true);
+      setShowRestoreDialog(false);
+      toast.success("Session restored!");
+    }
+  }, [savedSession]);
+
+  // Start fresh
+  const startFresh = useCallback(() => {
+    clear();
+    setSavedSession(null);
+    setShowRestoreDialog(false);
+    fetchRandomQuestion();
+  }, [clear]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -121,9 +190,10 @@ export default function PointGenerationDrill() {
   };
 
   const resetDrill = () => {
-    setTimer(180);
+    setTimer(DRILL_TIME);
     setIsRunning(false);
     setPoints(["", "", ""]);
+    clear();
   };
 
   const toggleTimer = () => {
@@ -141,12 +211,6 @@ export default function PointGenerationDrill() {
     topic.points.some(p => p.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
   const handleSubmitPoints = () => {
     const filledPoints = points.filter(p => p.trim() !== "");
     
@@ -163,6 +227,7 @@ export default function PointGenerationDrill() {
 
     // Stop the timer
     setIsRunning(false);
+    clear();
     
     // Show the points submitted
     console.log("Submitted points:", filledPoints);
@@ -182,7 +247,7 @@ export default function PointGenerationDrill() {
           <p className="text-muted-foreground text-sm">Target: 3 strong points in 3 minutes</p>
         </div>
         <div className="flex items-center space-x-4">
-          <div className={`text-2xl font-mono font-bold ${timer < 30 ? "text-red-500" : ""}`}>
+          <div className={`text-2xl font-mono font-bold ${getTimerColorClass(timer, 30)}`}>
             {formatTime(timer)}
           </div>
           <Button onClick={toggleTimer} variant={isRunning ? "destructive" : "default"}>
@@ -294,7 +359,34 @@ export default function PointGenerationDrill() {
           </ScrollArea>
         </div>
       </div>
+
+      {/* Restore Session Dialog */}
+      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <RotateCcw className="h-5 w-5" /> 發現未完成的練習
+            </DialogTitle>
+            <DialogDescription>
+              你有一個 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的 Point Generation 練習。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
+            {savedSession?.points?.map((p, i) => (
+              p.trim() && <p key={i} className="text-muted-foreground">• {p}</p>
+            ))}
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" onClick={startFresh} className="flex-1">
+              重新開始
+            </Button>
+            <Button onClick={restoreSession} className="flex-1">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              恢復練習
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-

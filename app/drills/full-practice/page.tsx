@@ -19,11 +19,13 @@ import {
   Clock,
   AlertCircle,
   CheckCircle,
-  XCircle,
-  AlertTriangle,
   FileText,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAutoSave, formatTimeSince } from "@/lib/hooks/use-auto-save";
+import { formatTime, getTimerColorClass, countWords, getQualityIcon } from "@/lib/drill-utils";
+import { useDebounceSubmit } from "@/lib/hooks/use-api-request";
 
 interface Question {
   id: string;
@@ -66,6 +68,14 @@ interface FullFeedback {
   task2: TaskFeedback | null;
 }
 
+interface SavedSession {
+  task1Text: string;
+  task2Text: string;
+  timer: number;
+  phase: Phase;
+  savedAt: number;
+}
+
 // Constants
 const TASK1_TIME = 20 * 60; // 20 minutes
 const TASK2_TIME = 40 * 60; // 40 minutes
@@ -88,9 +98,61 @@ export default function FullTimedPractice() {
   const [feedback, setFeedback] = useState<FullFeedback | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [activeTab, setActiveTab] = useState("task1");
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
-  const task1WordCount = task1Text.trim().split(/\s+/).filter((w) => w.length > 0).length;
-  const task2WordCount = task2Text.trim().split(/\s+/).filter((w) => w.length > 0).length;
+  // Auto-save hook - custom for full practice (saves both tasks)
+  const { save, load, clear } = useAutoSave({ key: "full-practice-drill" });
+  
+  // Prevent double-submit
+  const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
+
+  const task1WordCount = countWords(task1Text);
+  const task2WordCount = countWords(task2Text);
+
+  // Check for saved session on mount
+  useEffect(() => {
+    const saved = load();
+    if (saved && ((saved as SavedSession).task1Text || (saved as SavedSession).task2Text)) {
+      const sessionData = saved as SavedSession;
+      if (sessionData.task1Text?.trim().length > 0 || sessionData.task2Text?.trim().length > 0) {
+        setSavedSession(sessionData);
+        setShowRestoreDialog(true);
+      }
+    }
+  }, [load]);
+
+  // Auto-save when text changes
+  useEffect(() => {
+    if (phase !== "setup" && (task1Text.trim().length > 0 || task2Text.trim().length > 0)) {
+      save({
+        task1Text,
+        task2Text,
+        timer,
+        phase,
+      } as unknown as { text: string; timer: number });
+    }
+  }, [task1Text, task2Text, timer, phase, save]);
+
+  // Restore previous session
+  const restoreSession = useCallback(() => {
+    if (savedSession) {
+      setTask1Text(savedSession.task1Text || "");
+      setTask2Text(savedSession.task2Text || "");
+      setTimer(savedSession.timer);
+      setPhase(savedSession.phase || "task1");
+      setIsRunning(true);
+      setShowRestoreDialog(false);
+      toast.success("Session restored!");
+    }
+  }, [savedSession]);
+
+  // Start fresh
+  const startFresh = useCallback(() => {
+    clear();
+    setSavedSession(null);
+    setShowRestoreDialog(false);
+  }, [clear]);
 
   // Timer logic
   useEffect(() => {
@@ -119,8 +181,6 @@ export default function FullTimedPractice() {
   const fetchQuestions = useCallback(async () => {
     setLoading(true);
     try {
-      // Fetch two random questions (ideally one Task 1 and one Task 2)
-      // For now, we'll use Task 2 questions for both but label them appropriately
       const [res1, res2] = await Promise.all([
         fetch("/api/questions/random"),
         fetch("/api/questions/random"),
@@ -131,7 +191,6 @@ export default function FullTimedPractice() {
       const q1 = await res1.json();
       const q2 = await res2.json();
 
-      // Assign as Task 1 and Task 2
       setTask1Question({ ...q1, taskType: "Task 1" });
       setTask2Question({ ...q2, taskType: "Task 2" });
     } catch {
@@ -142,6 +201,7 @@ export default function FullTimedPractice() {
   }, []);
 
   const startPractice = async () => {
+    clear();
     await fetchQuestions();
     setTimer(TOTAL_TIME);
     setPhase("task1");
@@ -165,53 +225,49 @@ export default function FullTimedPractice() {
   };
 
   const handleSubmit = async () => {
-    setSubmitting(true);
-    setIsRunning(false);
+    await withDebounce(async () => {
+      setSubmitting(true);
+      setIsRunning(false);
 
-    try {
-      // Get feedback for both tasks
-      const [res1, res2] = await Promise.all([
-        task1Text.trim()
-          ? fetch("/api/feedback", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                drillType: "task1_report",
-                prompt: task1Question?.questionText,
-                userResponse: task1Text,
-              }),
-            })
-          : Promise.resolve(null),
-        task2Text.trim()
-          ? fetch("/api/feedback", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                drillType: "template_fill",
-                prompt: task2Question?.questionText,
-                userResponse: task2Text,
-              }),
-            })
-          : Promise.resolve(null),
-      ]);
+      try {
+        const [res1, res2] = await Promise.all([
+          task1Text.trim()
+            ? fetch("/api/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  drillType: "task1_report",
+                  prompt: task1Question?.questionText,
+                  userResponse: task1Text,
+                }),
+              })
+            : Promise.resolve(null),
+          task2Text.trim()
+            ? fetch("/api/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  drillType: "template_fill",
+                  prompt: task2Question?.questionText,
+                  userResponse: task2Text,
+                }),
+              })
+            : Promise.resolve(null),
+        ]);
 
-      const task1Feedback = res1 && res1.ok ? (await res1.json()).feedback : null;
-      const task2Feedback = res2 && res2.ok ? (await res2.json()).feedback : null;
+        const task1Feedback = res1 && res1.ok ? (await res1.json()).feedback : null;
+        const task2Feedback = res2 && res2.ok ? (await res2.json()).feedback : null;
 
-      setFeedback({ task1: task1Feedback, task2: task2Feedback });
-      setPhase("review");
-      setShowFeedback(true);
-    } catch {
-      toast.error("Failed to get feedback");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
+        setFeedback({ task1: task1Feedback, task2: task2Feedback });
+        setPhase("review");
+        setShowFeedback(true);
+        clear();
+      } catch {
+        toast.error("Failed to get feedback");
+      } finally {
+        setSubmitting(false);
+      }
+    });
   };
 
   const getElapsedProgress = () => {
@@ -228,16 +284,6 @@ export default function FullTimedPractice() {
       return Math.min(100, (task2Elapsed / TASK2_TIME) * 100);
     }
     return 100;
-  };
-
-  const getIcon = (good: boolean | string) => {
-    if (good === true || good === "clear" || good === "skillful" || good === "wide") {
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
-    }
-    if (good === "adequate" || good === "unclear") {
-      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    }
-    return <XCircle className="h-4 w-4 text-red-500" />;
   };
 
   const renderFeedbackSection = (taskFeedback: TaskFeedback | null, taskNum: number) => {
@@ -269,7 +315,7 @@ export default function FullTimedPractice() {
         {/* Task Response */}
         <div className="space-y-2">
           <h4 className="font-semibold flex items-center gap-2">
-            {getIcon(taskFeedback.task_response?.prompt_addressed)}
+            {getQualityIcon(taskFeedback.task_response?.prompt_addressed)}
             Task Response
           </h4>
           <p className="text-sm">Position: {taskFeedback.task_response?.position_clarity}</p>
@@ -285,7 +331,7 @@ export default function FullTimedPractice() {
         {/* Coherence */}
         <div className="space-y-2">
           <h4 className="font-semibold flex items-center gap-2">
-            {getIcon(taskFeedback.coherence_cohesion?.paragraph_structure)}
+            {getQualityIcon(taskFeedback.coherence_cohesion?.paragraph_structure)}
             Coherence & Cohesion
           </h4>
           {taskFeedback.coherence_cohesion?.logic_flow?.breaks?.length > 0 && (
@@ -312,7 +358,7 @@ export default function FullTimedPractice() {
         {/* Grammar */}
         <div className="space-y-2">
           <h4 className="font-semibold flex items-center gap-2">
-            {getIcon(taskFeedback.grammar_accuracy?.range)}
+            {getQualityIcon(taskFeedback.grammar_accuracy?.range)}
             Grammar ({taskFeedback.grammar_accuracy?.range} range)
           </h4>
           {taskFeedback.grammar_accuracy?.errors?.length > 0 && (
@@ -347,11 +393,7 @@ export default function FullTimedPractice() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div
-            className={`text-3xl font-mono font-bold ${
-              timer < 300 ? "text-red-500" : timer < 600 ? "text-yellow-500" : "text-primary"
-            }`}
-          >
+          <div className={`text-3xl font-mono font-bold ${getTimerColorClass(timer)}`}>
             <Clock className="inline h-6 w-6 mr-2" />
             {formatTime(timer)}
           </div>
@@ -459,7 +501,7 @@ export default function FullTimedPractice() {
               </Button>
             )}
             <div className="flex-1" />
-            <Button onClick={handleSubmit} disabled={submitting}>
+            <Button onClick={handleSubmit} disabled={submitting || isDebouncing}>
               {submitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
@@ -612,6 +654,33 @@ export default function FullTimedPractice() {
         </div>
       )}
 
+      {/* Restore Session Dialog */}
+      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <RotateCcw className="h-5 w-5" /> 發現未完成的練習
+            </DialogTitle>
+            <DialogDescription>
+              你有一個 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的練習階段。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-muted rounded-lg text-sm space-y-2">
+            <p>Task 1: {countWords(savedSession?.task1Text || "")} words</p>
+            <p>Task 2: {countWords(savedSession?.task2Text || "")} words</p>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" onClick={startFresh} className="flex-1">
+              重新開始
+            </Button>
+            <Button onClick={restoreSession} className="flex-1">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              恢復練習
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Feedback Dialog */}
       <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
@@ -638,4 +707,3 @@ export default function FullTimedPractice() {
     </div>
   );
 }
-

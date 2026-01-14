@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { openai, deployment } from "@/lib/openai";
+import { parseAIResponse, createFallbackFeedback } from "@/lib/ai-response-parser";
 
 const SYSTEM_PROMPTS: Record<string, string> = {
   opening: `You are an expert IELTS Writing Task 2 examiner focusing on Opening Paragraphs.
@@ -402,7 +403,7 @@ export async function POST(request: Request) {
       max_completion_tokens: 16000,
     });
 
-    let feedbackText = response.choices[0]?.message?.content;
+    const feedbackText = response.choices[0]?.message?.content;
     if (!feedbackText) {
       return NextResponse.json(
         { error: "No response from AI" },
@@ -410,31 +411,53 @@ export async function POST(request: Request) {
       );
     }
 
-    // Clean up potential markdown code blocks
-    feedbackText = feedbackText.trim();
-    if (feedbackText.startsWith("```json")) {
-      feedbackText = feedbackText.slice(7);
-    } else if (feedbackText.startsWith("```")) {
-      feedbackText = feedbackText.slice(3);
+    // Parse AI response with robust error handling
+    const parseResult = parseAIResponse<Record<string, unknown>>(feedbackText);
+    
+    if (parseResult.success && parseResult.data) {
+      return NextResponse.json({ feedback: parseResult.data });
     }
-    if (feedbackText.endsWith("```")) {
-      feedbackText = feedbackText.slice(0, -3);
-    }
-    feedbackText = feedbackText.trim();
-
-    const feedback = JSON.parse(feedbackText);
-    return NextResponse.json({ feedback });
+    
+    // Parsing failed - return fallback feedback so user still gets something useful
+    console.warn("AI response parsing failed:", parseResult.error);
+    console.warn("Raw response:", feedbackText.slice(0, 500));
+    
+    const fallbackFeedback = createFallbackFeedback(feedbackText, drillType);
+    return NextResponse.json({ 
+      feedback: fallbackFeedback,
+      parseWarning: "Response was partially parsed. Some feedback may be missing.",
+    });
+    
   } catch (err) {
     console.error("AI Feedback Error:", err);
-    // Log more details for debugging
+    
+    // Differentiate between different error types
     if (err instanceof Error) {
-      console.error("Error name:", err.name);
-      console.error("Error message:", err.message);
-      console.error("Error stack:", err.stack);
+      // Check for specific Azure OpenAI errors
+      if (err.message.includes("rate limit")) {
+        return NextResponse.json(
+          { error: "AI service rate limit exceeded. Please wait a moment and try again." },
+          { status: 429 }
+        );
+      }
+      if (err.message.includes("timeout") || err.message.includes("ETIMEDOUT")) {
+        return NextResponse.json(
+          { error: "AI service timeout. Your essay may be too long, or the service is busy." },
+          { status: 504 }
+        );
+      }
+      if (err.message.includes("Invalid API Key") || err.message.includes("401")) {
+        console.error("API Key issue - check Azure OpenAI configuration");
+        return NextResponse.json(
+          { error: "AI service configuration error. Please contact support." },
+          { status: 500 }
+        );
+      }
     }
+    
     return NextResponse.json(
       { 
-        error: "Failed to get AI feedback",
+        error: "Failed to get AI feedback. Please try again.",
         details: err instanceof Error ? err.message : "Unknown error"
       },
       { status: 500 }

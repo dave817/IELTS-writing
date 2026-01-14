@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,17 +16,19 @@ import {
   Send,
   Loader2,
   Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
   ChevronDown,
   BarChart3,
   TrendingUp,
   Map,
   Workflow,
   Table,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAutoSave, formatTimeSince } from "@/lib/hooks/use-auto-save";
+import { formatTime, getTimerColorClass, countWords, getQualityIcon } from "@/lib/drill-utils";
+import { useDebounceSubmit } from "@/lib/hooks/use-api-request";
 
 // Sample Task 1 questions (since we don't have them in the database yet)
 const TASK1_QUESTIONS = [
@@ -226,6 +228,14 @@ interface Task1Feedback {
   overall_comment: string;
 }
 
+interface SavedSession {
+  text: string;
+  timer: number;
+  questionId?: string;
+  questionText?: string;
+  savedAt: number;
+}
+
 const DRILL_TIME = 20 * 60; // 20 minutes
 const MIN_WORDS = 150;
 
@@ -238,8 +248,55 @@ export default function Task1Drill() {
   const [feedback, setFeedback] = useState<Task1Feedback | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [vocabOpen, setVocabOpen] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
-  const wordCount = text.trim().split(/\s+/).filter((w) => w.length > 0).length;
+  // Auto-save hook
+  const { save, load, clear } = useAutoSave({ key: "task1-drill" });
+  
+  // Prevent double-submit
+  const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
+
+  const wordCount = countWords(text);
+
+  // Check for saved session on mount
+  useEffect(() => {
+    const saved = load();
+    if (saved && saved.text && saved.text.trim().length > 0) {
+      setSavedSession(saved as SavedSession);
+      setShowRestoreDialog(true);
+    }
+  }, [load]);
+
+  // Auto-save when text changes
+  useEffect(() => {
+    if (currentQuestion && text.trim().length > 0) {
+      save({
+        text,
+        timer,
+        questionId: currentQuestion.id,
+        questionText: currentQuestion.question,
+      });
+    }
+  }, [text, timer, currentQuestion, save]);
+
+  // Restore previous session
+  const restoreSession = useCallback(() => {
+    if (savedSession) {
+      setText(savedSession.text);
+      setTimer(savedSession.timer);
+      setIsRunning(true);
+      setShowRestoreDialog(false);
+      toast.success("Session restored!");
+    }
+  }, [savedSession]);
+
+  // Start fresh
+  const startFresh = useCallback(() => {
+    clear();
+    setSavedSession(null);
+    setShowRestoreDialog(false);
+  }, [clear]);
 
   // Timer logic
   useEffect(() => {
@@ -260,6 +317,7 @@ export default function Task1Drill() {
   }, [isRunning, timer]);
 
   const startDrill = () => {
+    clear();
     setTimer(DRILL_TIME);
     setIsRunning(true);
     setText("");
@@ -272,6 +330,7 @@ export default function Task1Drill() {
     setCurrentQuestion(TASK1_QUESTIONS[randomIndex]);
     setText("");
     setFeedback(null);
+    clear();
     if (!isRunning) {
       setTimer(DRILL_TIME);
     }
@@ -283,45 +342,36 @@ export default function Task1Drill() {
       return;
     }
 
-    setSubmitting(true);
-    setIsRunning(false);
+    await withDebounce(async () => {
+      setSubmitting(true);
+      setIsRunning(false);
 
-    try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          drillType: "task1_report",
-          prompt: currentQuestion.question,
-          userResponse: text,
-        }),
-      });
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            drillType: "task1_report",
+            prompt: currentQuestion.question,
+            userResponse: text,
+          }),
+        });
 
-      if (!res.ok) throw new Error("Failed to get feedback");
-      const data = await res.json();
-      setFeedback(data.feedback);
-      setShowFeedback(true);
-    } catch {
-      toast.error("Failed to get AI feedback");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getIcon = (good: boolean | string) => {
-    if (good === true || good === "clear" || good === "skillful" || good === "wide" || good === "accurate") {
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
-    }
-    if (good === "adequate" || good === "unclear" || good === "mostly_accurate") {
-      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    }
-    return <XCircle className="h-4 w-4 text-red-500" />;
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to get feedback");
+        }
+        const data = await res.json();
+        setFeedback(data.feedback);
+        setShowFeedback(true);
+        clear();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to get AI feedback";
+        toast.error(message);
+      } finally {
+        setSubmitting(false);
+      }
+    });
   };
 
   const QuestionIcon = currentQuestion.icon;
@@ -340,11 +390,7 @@ export default function Task1Drill() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          <div
-            className={`text-3xl font-mono font-bold ${
-              timer < 120 ? "text-red-500" : timer < 300 ? "text-yellow-500" : "text-primary"
-            }`}
-          >
+          <div className={`text-3xl font-mono font-bold ${getTimerColorClass(timer)}`}>
             <Clock className="inline h-6 w-6 mr-2" />
             {formatTime(timer)}
           </div>
@@ -547,7 +593,7 @@ Looking at the details..."
                     </Badge>
                   )}
                 </div>
-                <Button onClick={handleSubmit} disabled={submitting || !text.trim()}>
+                <Button onClick={handleSubmit} disabled={submitting || isDebouncing || !text.trim()}>
                   {submitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...
@@ -563,6 +609,34 @@ Looking at the details..."
           </Card>
         </div>
       </div>
+
+      {/* Restore Session Dialog */}
+      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <RotateCcw className="h-5 w-5" /> 發現未完成的練習
+            </DialogTitle>
+            <DialogDescription>
+              你有一篇 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的報告。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-muted rounded-lg text-sm max-h-24 overflow-hidden">
+            <p className="line-clamp-3 text-muted-foreground">
+              {savedSession?.text?.slice(0, 200)}...
+            </p>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" onClick={startFresh} className="flex-1">
+              重新開始
+            </Button>
+            <Button onClick={restoreSession} className="flex-1">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              恢復練習
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Feedback Dialog */}
       <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
@@ -592,16 +666,16 @@ Looking at the details..."
                 {/* Task Achievement */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.task_response?.prompt_addressed)}
+                    {getQualityIcon(feedback.task_response?.prompt_addressed)}
                     Task Achievement
                   </h3>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex items-center gap-2">
-                      {getIcon(feedback.task_response?.overview_present)}
+                      {getQualityIcon(feedback.task_response?.overview_present)}
                       <span>Overview: {feedback.task_response?.overview_present ? "Present" : "Missing"}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      {getIcon(feedback.task_response?.key_features_covered)}
+                      {getQualityIcon(feedback.task_response?.key_features_covered)}
                       <span>
                         Key Features: {feedback.task_response?.key_features_covered ? "Covered" : "Missing"}
                       </span>
@@ -619,7 +693,7 @@ Looking at the details..."
                 {/* Coherence */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.coherence_cohesion?.paragraph_structure)}
+                    {getQualityIcon(feedback.coherence_cohesion?.paragraph_structure)}
                     Coherence & Cohesion ({feedback.coherence_cohesion?.paragraph_structure})
                   </h3>
                   {feedback.coherence_cohesion?.logic_flow?.breaks?.length > 0 && (
@@ -641,7 +715,7 @@ Looking at the details..."
                 {/* Lexical Resource */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.lexical_resource?.data_language_accuracy)}
+                    {getQualityIcon(feedback.lexical_resource?.data_language_accuracy)}
                     Lexical Resource (Data Language: {feedback.lexical_resource?.data_language_accuracy})
                   </h3>
                   {feedback.lexical_resource?.precision_issues?.length > 0 && (
@@ -669,7 +743,7 @@ Looking at the details..."
                 {/* Grammar */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.grammar_accuracy?.range)}
+                    {getQualityIcon(feedback.grammar_accuracy?.range)}
                     Grammar Accuracy ({feedback.grammar_accuracy?.range} range)
                   </h3>
                   {feedback.grammar_accuracy?.errors?.length > 0 && (
@@ -694,4 +768,3 @@ Looking at the details..."
     </div>
   );
 }
-

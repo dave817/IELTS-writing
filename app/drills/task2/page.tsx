@@ -18,15 +18,17 @@ import {
   Send,
   Loader2,
   Clock,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
   ChevronDown,
   Lightbulb,
   Target,
   AlertCircle,
+  AlertTriangle,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAutoSave, formatTimeSince } from "@/lib/hooks/use-auto-save";
+import { formatTime, getTimerColorClass, countWords, getQualityIcon, getWordCountProgress } from "@/lib/drill-utils";
+import { useDebounceSubmit } from "@/lib/hooks/use-api-request";
 
 interface Question {
   id: string;
@@ -123,9 +125,10 @@ const MNEMONICS = {
   },
 };
 
-// Question type structures
-const QUESTION_STRUCTURES = {
-  "Type A": {
+// Question type structures - keys match seed.js questionType values
+const QUESTION_STRUCTURES: Record<string, { name: string; structure: string[] }> = {
+  // Discussion = Discuss Both Views + Give Opinion
+  "Discussion": {
     name: "Discuss Both Views",
     structure: [
       "Introduction: Paraphrase + stance",
@@ -135,7 +138,8 @@ const QUESTION_STRUCTURES = {
       "Conclusion: Summarize + restate position",
     ],
   },
-  "Type B": {
+  // Opinion = To What Extent Do You Agree
+  "Opinion": {
     name: "To What Extent / Opinion",
     structure: [
       "Introduction: Paraphrase + clear stance",
@@ -145,7 +149,8 @@ const QUESTION_STRUCTURES = {
       "Conclusion: Summarize + strengthen position",
     ],
   },
-  "Type C": {
+  // Advantage/Disadvantage
+  "Advantage/Disadvantage": {
     name: "Advantages & Disadvantages",
     structure: [
       "Introduction: Paraphrase topic",
@@ -154,7 +159,8 @@ const QUESTION_STRUCTURES = {
       "Conclusion: Overall assessment",
     ],
   },
-  "Type D": {
+  // Solution = Problems/Causes/Solutions
+  "Solution": {
     name: "Problems/Causes/Solutions",
     structure: [
       "Introduction: Acknowledge the issue",
@@ -163,7 +169,8 @@ const QUESTION_STRUCTURES = {
       "Conclusion: Summarize + call to action",
     ],
   },
-  "Type E": {
+  // Direct Questions
+  "Direct Questions": {
     name: "Direct Questions",
     structure: [
       "Introduction: Address the topic",
@@ -173,11 +180,54 @@ const QUESTION_STRUCTURES = {
       "Conclusion: Tie answers together",
     ],
   },
+  // Task 1 types
+  "Chart": {
+    name: "Data Description (Chart/Graph)",
+    structure: [
+      "Introduction: Paraphrase the chart type and time period",
+      "Overview: Key trends and main features (2-3 sentences)",
+      "Body 1: First group of data with specific figures",
+      "Body 2: Second group with comparisons",
+    ],
+  },
+  "Map": {
+    name: "Map Comparison",
+    structure: [
+      "Introduction: Describe the maps and time period",
+      "Overview: Main changes/developments",
+      "Body 1: Major changes in one area",
+      "Body 2: Changes in other areas",
+    ],
+  },
+  "Process": {
+    name: "Process Description",
+    structure: [
+      "Introduction: Describe what the process shows",
+      "Overview: Number of stages, type of process",
+      "Body 1: First half of the process",
+      "Body 2: Second half of the process",
+    ],
+  },
+  // Fallback for restored sessions
+  "Restored": {
+    name: "Restored Session",
+    structure: [
+      "Continue from where you left off",
+    ],
+  },
 };
 
 const DRILL_TIME = 40 * 60; // 40 minutes
 const MIN_WORDS = 250;
 const TARGET_WORDS = 500;
+
+interface SavedSession {
+  text: string;
+  timer: number;
+  questionId?: string;
+  questionText?: string;
+  savedAt: number;
+}
 
 export default function Task2Drill() {
   const [question, setQuestion] = useState<Question | null>(null);
@@ -191,9 +241,63 @@ export default function Task2Drill() {
   const [mnemonicsOpen, setMnemonicsOpen] = useState(true);
   const [structureOpen, setStructureOpen] = useState(false);
   const [showLowWordWarning, setShowLowWordWarning] = useState(false);
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
-  const wordCount = text.trim().split(/\s+/).filter((w) => w.length > 0).length;
-  const progress = Math.min(100, (wordCount / TARGET_WORDS) * 100);
+  // Auto-save hook
+  const { save, load, clear } = useAutoSave({ key: "task2-drill" });
+  
+  // Prevent double-submit
+  const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
+
+  const wordCount = countWords(text);
+  const progress = getWordCountProgress(wordCount, TARGET_WORDS);
+
+  // Check for saved session on mount
+  useEffect(() => {
+    const saved = load();
+    if (saved && saved.text && saved.text.trim().length > 0) {
+      setSavedSession(saved as SavedSession);
+      setShowRestoreDialog(true);
+    }
+  }, [load]);
+
+  // Auto-save when text or timer changes (only when drill is active)
+  useEffect(() => {
+    if (question && text.trim().length > 0) {
+      save({
+        text,
+        timer,
+        questionId: question.id,
+        questionText: question.questionText,
+      });
+    }
+  }, [text, timer, question, save]);
+
+  // Restore previous session
+  const restoreSession = useCallback(() => {
+    if (savedSession) {
+      setText(savedSession.text);
+      setTimer(savedSession.timer);
+      if (savedSession.questionText) {
+        setQuestion({
+          id: savedSession.questionId || "restored",
+          questionText: savedSession.questionText,
+          questionType: "Restored",
+        });
+      }
+      setIsRunning(true);
+      setShowRestoreDialog(false);
+      toast.success("Session restored! Continue where you left off.");
+    }
+  }, [savedSession]);
+
+  // Start fresh (discard saved session)
+  const startFresh = useCallback(() => {
+    clear();
+    setSavedSession(null);
+    setShowRestoreDialog(false);
+  }, [clear]);
 
   // Fetch random question
   const fetchQuestion = useCallback(async () => {
@@ -229,6 +333,7 @@ export default function Task2Drill() {
   }, [isRunning, timer]);
 
   const startDrill = async () => {
+    clear(); // Clear any previous saved session
     await fetchQuestion();
     setTimer(DRILL_TIME);
     setIsRunning(true);
@@ -251,50 +356,50 @@ export default function Task2Drill() {
       return;
     }
 
-    setShowLowWordWarning(false);
-    setSubmitting(true);
-    setIsRunning(false);
+    // Prevent double-submit
+    await withDebounce(async () => {
+      setShowLowWordWarning(false);
+      setSubmitting(true);
+      setIsRunning(false);
 
-    try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          drillType: "template_fill",
-          prompt: question?.questionText,
-          userResponse: text,
-        }),
-      });
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            drillType: "template_fill",
+            prompt: question?.questionText,
+            userResponse: text,
+          }),
+        });
 
-      if (!res.ok) throw new Error("Failed to get feedback");
-      const data = await res.json();
-      setFeedback(data.feedback);
-      setShowFeedback(true);
-    } catch {
-      toast.error("Failed to get AI feedback");
-    } finally {
-      setSubmitting(false);
-    }
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || "Failed to get feedback");
+        }
+        
+        const data = await res.json();
+        setFeedback(data.feedback);
+        setShowFeedback(true);
+        clear(); // Clear saved session on successful submission
+        
+        // Show warning if there was a parse issue
+        if (data.parseWarning) {
+          toast.warning(data.parseWarning);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to get AI feedback";
+        toast.error(message);
+      } finally {
+        setSubmitting(false);
+      }
+    });
   };
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const getIcon = (good: boolean | string) => {
-    if (good === true || good === "clear" || good === "skillful" || good === "wide") {
-      return <CheckCircle className="h-4 w-4 text-green-500" />;
-    }
-    if (good === "adequate" || good === "unclear") {
-      return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
-    }
-    return <XCircle className="h-4 w-4 text-red-500" />;
-  };
+  // formatTime and getQualityIcon are now imported from @/lib/drill-utils
 
   const currentStructure = question?.questionType
-    ? QUESTION_STRUCTURES[question.questionType as keyof typeof QUESTION_STRUCTURES]
+    ? QUESTION_STRUCTURES[question.questionType]
     : null;
 
   return (
@@ -312,9 +417,7 @@ export default function Task2Drill() {
         </div>
         <div className="flex items-center gap-4">
           <div
-            className={`text-3xl font-mono font-bold ${
-              timer < 300 ? "text-red-500" : timer < 600 ? "text-yellow-500" : "text-primary"
-            }`}
+            className={`text-3xl font-mono font-bold ${getTimerColorClass(timer)}`}
           >
             <Clock className="inline h-6 w-6 mr-2" />
             {formatTime(timer)}
@@ -532,7 +635,7 @@ In conclusion, while both sides present valid arguments..."
                       <Badge className="bg-green-600">✓ Band 9 word count achieved</Badge>
                     )}
                   </div>
-                  <Button onClick={handleSubmit} disabled={submitting || !text.trim()}>
+                  <Button onClick={handleSubmit} disabled={submitting || isDebouncing || !text.trim()}>
                     {submitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing...
@@ -589,6 +692,36 @@ In conclusion, while both sides present valid arguments..."
           </CardContent>
         </Card>
       )}
+
+      {/* Restore Session Dialog */}
+      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <RotateCcw className="h-5 w-5" /> 發現未完成的作文
+            </DialogTitle>
+            <DialogDescription>
+              你有一篇 {savedSession ? formatTimeSince(savedSession.savedAt) : ""} 保存的作文，
+              共 {savedSession?.text?.trim().split(/\s+/).filter(w => w.length > 0).length || 0} 字，
+              剩餘時間 {savedSession ? Math.floor(savedSession.timer / 60) : 0} 分鐘。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 bg-muted rounded-lg text-sm max-h-32 overflow-hidden">
+            <p className="line-clamp-4 text-muted-foreground">
+              {savedSession?.text?.slice(0, 300)}...
+            </p>
+          </div>
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" onClick={startFresh} className="flex-1">
+              重新開始
+            </Button>
+            <Button onClick={restoreSession} className="flex-1">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              恢復作文
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Low Word Count Warning */}
       <Dialog open={showLowWordWarning} onOpenChange={setShowLowWordWarning}>
@@ -649,7 +782,7 @@ In conclusion, while both sides present valid arguments..."
                 {/* Task Response */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.task_response?.prompt_addressed)}
+                    {getQualityIcon(feedback.task_response?.prompt_addressed)}
                     Task Response
                   </h3>
                   <p className="text-sm">Position Clarity: {feedback.task_response?.position_clarity}</p>
@@ -665,7 +798,7 @@ In conclusion, while both sides present valid arguments..."
                 {/* Coherence & Cohesion */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.coherence_cohesion?.paragraph_structure)}
+                    {getQualityIcon(feedback.coherence_cohesion?.paragraph_structure)}
                     Coherence & Cohesion ({feedback.coherence_cohesion?.paragraph_structure})
                   </h3>
                   {feedback.coherence_cohesion?.logic_flow?.breaks?.length > 0 && (
@@ -712,7 +845,7 @@ In conclusion, while both sides present valid arguments..."
                 {/* Grammar */}
                 <div className="space-y-2">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getIcon(feedback.grammar_accuracy?.range)}
+                    {getQualityIcon(feedback.grammar_accuracy?.range)}
                     Grammar Accuracy ({feedback.grammar_accuracy?.range} range)
                   </h3>
                   {feedback.grammar_accuracy?.errors?.length > 0 && (
