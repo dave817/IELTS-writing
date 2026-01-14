@@ -27,7 +27,7 @@ interface SavedSession {
   timer: number;
   questionId?: string;
   questionText?: string;
-  savedAt: number;
+  savedAt?: number;
 }
 
 const MNEMONICS = [
@@ -102,15 +102,14 @@ export default function PointGenerationDrill() {
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
   // Auto-save hook
-  const { save, load, clear } = useAutoSave({ key: "point-generation-drill" });
+  const { save, load, clear } = useAutoSave<SavedSession>({ key: "point-generation-drill" });
 
   // Check for saved session on mount
   useEffect(() => {
     const saved = load();
     if (saved) {
-      const sessionData = saved as SavedSession;
-      if (sessionData.points && sessionData.points.some((p: string) => p.trim() !== "")) {
-        setSavedSession(sessionData);
+      if (saved.points && saved.points.some((p: string) => p.trim() !== "")) {
+        setSavedSession(saved);
         setShowRestoreDialog(true);
       } else {
         fetchRandomQuestion();
@@ -129,7 +128,7 @@ export default function PointGenerationDrill() {
         timer,
         questionId: question.id,
         questionText: question.questionText,
-      } as unknown as { text: string; timer: number });
+      });
     }
   }, [points, timer, question, save]);
 

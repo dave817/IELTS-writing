@@ -68,12 +68,14 @@ interface FullFeedback {
   task2: TaskFeedback | null;
 }
 
+type Phase = "setup" | "task1" | "task2" | "review";
+
 interface SavedSession {
   task1Text: string;
   task2Text: string;
   timer: number;
   phase: Phase;
-  savedAt: number;
+  savedAt?: number;
 }
 
 // Constants
@@ -82,8 +84,6 @@ const TASK2_TIME = 40 * 60; // 40 minutes
 const TOTAL_TIME = TASK1_TIME + TASK2_TIME;
 const TASK1_MIN_WORDS = 150;
 const TASK2_MIN_WORDS = 250;
-
-type Phase = "setup" | "task1" | "task2" | "review";
 
 export default function FullTimedPractice() {
   const [phase, setPhase] = useState<Phase>("setup");
@@ -102,7 +102,7 @@ export default function FullTimedPractice() {
   const [savedSession, setSavedSession] = useState<SavedSession | null>(null);
 
   // Auto-save hook - custom for full practice (saves both tasks)
-  const { save, load, clear } = useAutoSave({ key: "full-practice-drill" });
+  const { save, load, clear } = useAutoSave<SavedSession>({ key: "full-practice-drill" });
   
   // Prevent double-submit
   const { withDebounce, isDebouncing } = useDebounceSubmit(1000);
@@ -113,10 +113,9 @@ export default function FullTimedPractice() {
   // Check for saved session on mount
   useEffect(() => {
     const saved = load();
-    if (saved && ((saved as SavedSession).task1Text || (saved as SavedSession).task2Text)) {
-      const sessionData = saved as SavedSession;
-      if (sessionData.task1Text?.trim().length > 0 || sessionData.task2Text?.trim().length > 0) {
-        setSavedSession(sessionData);
+    if (saved && (saved.task1Text || saved.task2Text)) {
+      if (saved.task1Text?.trim().length > 0 || saved.task2Text?.trim().length > 0) {
+        setSavedSession(saved);
         setShowRestoreDialog(true);
       }
     }
@@ -130,7 +129,7 @@ export default function FullTimedPractice() {
         task2Text,
         timer,
         phase,
-      } as unknown as { text: string; timer: number });
+      });
     }
   }, [task1Text, task2Text, timer, phase, save]);
 

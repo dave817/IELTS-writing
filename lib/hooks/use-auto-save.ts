@@ -2,12 +2,10 @@
 
 import { useEffect, useCallback, useRef } from "react";
 
-interface AutoSaveState {
-  text: string;
+// Base interface - can be extended by specific drills
+interface BaseAutoSaveState {
   timer: number;
-  questionId?: string;
-  questionText?: string;
-  startedAt?: number;
+  savedAt?: number;
 }
 
 interface UseAutoSaveOptions {
@@ -18,14 +16,16 @@ interface UseAutoSaveOptions {
 /**
  * Hook for auto-saving drill state to localStorage
  * Prevents losing work if browser crashes or tab is closed
+ * 
+ * Generic type T allows different drill pages to save different data structures
  */
-export function useAutoSave({ key, debounceMs = 1000 }: UseAutoSaveOptions) {
+export function useAutoSave<T extends BaseAutoSaveState>({ key, debounceMs = 1000 }: UseAutoSaveOptions) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const storageKey = `ielts-drill-${key}`;
 
   // Save state to localStorage with debounce
   const save = useCallback(
-    (state: AutoSaveState) => {
+    (state: Omit<T, 'savedAt'>) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -46,7 +46,7 @@ export function useAutoSave({ key, debounceMs = 1000 }: UseAutoSaveOptions) {
   );
 
   // Load state from localStorage
-  const load = useCallback((): (AutoSaveState & { savedAt: number }) | null => {
+  const load = useCallback((): (T & { savedAt: number }) | null => {
     try {
       const saved = localStorage.getItem(storageKey);
       if (!saved) return null;
@@ -60,7 +60,7 @@ export function useAutoSave({ key, debounceMs = 1000 }: UseAutoSaveOptions) {
         return null;
       }
 
-      return parsed;
+      return parsed as T & { savedAt: number };
     } catch (error) {
       console.error("Failed to load from localStorage:", error);
       return null;
@@ -109,4 +109,3 @@ export function formatTimeSince(timestamp: number): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小時前`;
   return `${Math.floor(seconds / 86400)} 天前`;
 }
-
