@@ -36,43 +36,8 @@ interface Question {
   questionType: string;
 }
 
-interface FullFeedback {
-  task_response: {
-    prompt_addressed: boolean;
-    position_clarity: string;
-    development_issues: string[];
-    relevance_flags: string[];
-  };
-  coherence_cohesion: {
-    paragraph_structure: string;
-    cohesive_device_issues: string[];
-    logic_flow: {
-      coherent: boolean;
-      adequate: boolean;
-      consistent: boolean;
-      breaks: string[];
-    };
-  };
-  lexical_resource: {
-    precision_issues: string[];
-    collocation_errors: string[];
-    register_issues: string[];
-  };
-  grammar_accuracy: {
-    errors: string[];
-    range: string;
-  };
-  band_9_comparison: {
-    model: string;
-    key_differences: string[];
-    upgrade_suggestions: string[];
-  };
-  word_count: {
-    total: number;
-    meets_minimum: boolean;
-  };
-  overall_comment: string;
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FullFeedback = Record<string, any>;
 
 // Mnemonics for point generation
 const MNEMONICS = {
@@ -758,7 +723,14 @@ In conclusion, while both sides present valid arguments..."
       <Dialog open={showFeedback} onOpenChange={setShowFeedback}>
         <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>Full Essay Feedback</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              Full Essay Feedback
+              {feedback?.estimated_band && (
+                <Badge variant="secondary" className="text-lg">
+                  Band: {feedback.estimated_band}
+                </Badge>
+              )}
+            </DialogTitle>
             <DialogDescription>Comprehensive AI analysis of your essay</DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[70vh] pr-4">
@@ -774,67 +746,30 @@ In conclusion, while both sides present valid arguments..."
                         feedback.word_count?.meets_minimum ? "text-green-600" : "text-red-500"
                       }`}
                     >
-                      {feedback.word_count?.meets_minimum ? "✓ Meets minimum" : "✗ Below minimum"}
+                      {feedback.word_count?.meets_minimum ? "✓ Meets minimum (250)" : "✗ Below minimum"}
                     </p>
                   </div>
                 </div>
 
                 {/* Task Response */}
-                <div className="space-y-2">
+                <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.task_response?.prompt_addressed)}
+                    {getQualityIcon(feedback.task_response_score)}
                     Task Response
+                    {feedback.task_response_score && (
+                      <Badge variant="outline">{feedback.task_response_score}</Badge>
+                    )}
                   </h3>
-                  <p className="text-sm">Position Clarity: {feedback.task_response?.position_clarity}</p>
-                  {feedback.task_response?.development_issues?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-yellow-700">
-                      {feedback.task_response.development_issues.map((issue, i) => (
-                        <li key={i}>{issue}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                {/* Coherence & Cohesion */}
-                <div className="space-y-2">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.coherence_cohesion?.paragraph_structure)}
-                    Coherence & Cohesion ({feedback.coherence_cohesion?.paragraph_structure})
-                  </h3>
-                  {feedback.coherence_cohesion?.logic_flow?.breaks?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-yellow-700">
-                      {feedback.coherence_cohesion.logic_flow.breaks.map((b, i) => (
-                        <li key={i}>{b}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {feedback.coherence_cohesion?.cohesive_device_issues?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-red-600">
-                      {feedback.coherence_cohesion.cohesive_device_issues.map((issue, i) => (
-                        <li key={i}>{issue}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                {/* Lexical Resource */}
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Lexical Resource</h3>
-                  {feedback.lexical_resource?.collocation_errors?.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Collocation Errors:</p>
-                      <ul className="list-disc list-inside text-sm text-red-600">
-                        {feedback.lexical_resource.collocation_errors.map((err, i) => (
-                          <li key={i}>{err}</li>
-                        ))}
-                      </ul>
+                  {feedback.task_response_comment && (
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-sm">{feedback.task_response_comment}</p>
                     </div>
                   )}
-                  {feedback.lexical_resource?.precision_issues?.length > 0 && (
+                  {feedback.task_response_issues?.length > 0 && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Precision Issues:</p>
-                      <ul className="list-disc list-inside text-sm text-yellow-700">
-                        {feedback.lexical_resource.precision_issues.map((issue, i) => (
+                      <p className="text-xs text-muted-foreground mb-1">Issues:</p>
+                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
+                        {feedback.task_response_issues.map((issue: string, i: number) => (
                           <li key={i}>{issue}</li>
                         ))}
                       </ul>
@@ -842,63 +777,143 @@ In conclusion, while both sides present valid arguments..."
                   )}
                 </div>
 
-                {/* Grammar */}
-                <div className="space-y-2">
+                {/* Coherence & Cohesion */}
+                <div className="space-y-3 p-4 border rounded-lg">
                   <h3 className="font-semibold flex items-center gap-2">
-                    {getQualityIcon(feedback.grammar_accuracy?.range)}
-                    Grammar Accuracy ({feedback.grammar_accuracy?.range} range)
+                    {getQualityIcon(feedback.coherence_score)}
+                    Coherence & Cohesion
+                    {feedback.coherence_score && (
+                      <Badge variant="outline">{feedback.coherence_score}</Badge>
+                    )}
                   </h3>
-                  {feedback.grammar_accuracy?.errors?.length > 0 && (
-                    <ul className="list-disc list-inside text-sm text-red-600">
-                      {feedback.grammar_accuracy.errors.map((err, i) => (
-                        <li key={i}>{err}</li>
-                      ))}
-                    </ul>
+                  {feedback.coherence_comment && (
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-sm">{feedback.coherence_comment}</p>
+                    </div>
+                  )}
+                  {feedback.coherence_issues?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Issues:</p>
+                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-400">
+                        {feedback.coherence_issues.map((issue: string, i: number) => (
+                          <li key={i}>{issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Lexical Resource */}
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    {getQualityIcon(feedback.lexical_score)}
+                    Lexical Resource
+                    {feedback.lexical_score && (
+                      <Badge variant="outline">{feedback.lexical_score}</Badge>
+                    )}
+                  </h3>
+                  {feedback.lexical_comment && (
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-sm">{feedback.lexical_comment}</p>
+                    </div>
+                  )}
+                  {feedback.lexical_good?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Good Vocabulary:</p>
+                      <ul className="list-disc list-inside text-sm text-green-700 dark:text-green-400">
+                        {feedback.lexical_good.map((item: string, i: number) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.lexical_errors?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Errors:</p>
+                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
+                        {feedback.lexical_errors.map((err: string, i: number) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Grammar */}
+                <div className="space-y-3 p-4 border rounded-lg">
+                  <h3 className="font-semibold flex items-center gap-2">
+                    {getQualityIcon(feedback.grammar_score)}
+                    Grammar Accuracy
+                    {feedback.grammar_score && (
+                      <Badge variant="outline">{feedback.grammar_score}</Badge>
+                    )}
+                  </h3>
+                  {feedback.grammar_comment && (
+                    <div className="bg-muted/50 p-3 rounded-lg">
+                      <p className="text-sm">{feedback.grammar_comment}</p>
+                    </div>
+                  )}
+                  {feedback.grammar_good?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Well-constructed Sentences:</p>
+                      <ul className="list-disc list-inside text-sm text-green-700 dark:text-green-400">
+                        {feedback.grammar_good.map((item: string, i: number) => (
+                          <li key={i}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.grammar_errors?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Errors:</p>
+                      <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400">
+                        {feedback.grammar_errors.map((err: string, i: number) => (
+                          <li key={i}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Strengths & Improvements */}
+                <div className="grid grid-cols-2 gap-4">
+                  {feedback.strengths?.length > 0 && (
+                    <div className="p-4 border border-green-200 dark:border-green-800 rounded-lg bg-green-50/50 dark:bg-green-950/20">
+                      <h4 className="font-semibold text-green-700 dark:text-green-400 mb-2">Strengths</h4>
+                      <ul className="list-disc list-inside text-sm">
+                        {feedback.strengths.map((s: string, i: number) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {feedback.improvements?.length > 0 && (
+                    <div className="p-4 border border-blue-200 dark:border-blue-800 rounded-lg bg-blue-50/50 dark:bg-blue-950/20">
+                      <h4 className="font-semibold text-blue-700 dark:text-blue-400 mb-2">Priority Improvements</h4>
+                      <ol className="list-decimal list-inside text-sm">
+                        {feedback.improvements.map((p: string, i: number) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ol>
+                    </div>
                   )}
                 </div>
 
                 {/* Overall Comment */}
                 <div className="p-4 bg-muted rounded-lg">
                   <h3 className="font-semibold mb-2">Overall Feedback</h3>
-                  <p className="text-sm">{feedback.overall_comment}</p>
+                  <p className="text-sm whitespace-pre-wrap">{feedback.overall_comment || "No overall feedback provided."}</p>
                 </div>
 
-                {/* Band 9 Comparison */}
-                {feedback.band_9_comparison && (
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Band 9 Comparison</h3>
-                    {feedback.band_9_comparison.key_differences?.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Key Differences:</p>
-                        <ul className="list-disc list-inside text-sm">
-                          {feedback.band_9_comparison.key_differences.map((diff, i) => (
-                            <li key={i}>{diff}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {feedback.band_9_comparison.upgrade_suggestions?.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Upgrade Suggestions:</p>
-                        <ul className="list-disc list-inside text-sm text-blue-600">
-                          {feedback.band_9_comparison.upgrade_suggestions.map((sug, i) => (
-                            <li key={i}>{sug}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {feedback.band_9_comparison.model && (
-                      <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
-                        <h4 className="font-semibold mb-2 text-green-700 dark:text-green-400">
-                          Band 9 Model Essay
-                        </h4>
-                        <ScrollArea className="h-[300px]">
-                          <p className="text-sm whitespace-pre-wrap">{feedback.band_9_comparison.model}</p>
-                        </ScrollArea>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Debug: Raw Response */}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    View Raw AI Response (debug)
+                  </summary>
+                  <pre className="mt-2 p-3 bg-muted rounded-lg overflow-auto max-h-48">
+                    {JSON.stringify(feedback, null, 2)}
+                  </pre>
+                </details>
               </div>
             )}
           </ScrollArea>
